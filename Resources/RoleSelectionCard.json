@@ -1,0 +1,102 @@
+{
+  "$schema": "http://adaptivecards.io/schemas/adaptive-card.json",
+  "type": "AdaptiveCard",
+  "version": "1.5",
+  "speak": "Flight KL0605 to San Fransisco has been delayed.It will not leave until 10:10 AM.",
+  "actions": [
+    {
+      "type": "Action.Submit",
+      "id": "btnSubmit",
+      "title": "Click here to change Role",
+      "data": {
+        "prop1": true,
+        "prop2": []
+      }
+    }
+  ],
+  "body": [
+    {
+      "type": "ColumnSet",
+      "spacing": "Medium",
+      "separator": true,
+      "columns": [
+        {
+          "type": "Column",
+          "width": 1,
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "Flight",
+              "isSubtle": true,
+              "weight": "Bolder",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "KL605",
+              "spacing": "Small",
+              "wrap": true
+            },
+            {
+              "type": "Input.ChoiceSet",
+              "label": "Select a user",
+              "id": "roleSelect",
+              "isMultiSelect": false,
+              "choices":  [
+                 { "title": "User 1", "value": "User1" },
+                 { "title": "User 2", "value": "User2" }
+               ],
+              "style": "expanded"
+           }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": 1,
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "Departs",
+              "isSubtle": true,
+              "horizontalAlignment": "Center",
+              "weight": "Bolder",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "{{TIME(2017-03-04T09:20:00-01:00)}}",
+              "color": "Attention",
+              "weight": "Bolder",
+              "horizontalAlignment": "Center",
+              "spacing": "Small",
+              "wrap": true
+            }
+          ]
+        },
+        {
+          "type": "Column",
+          "width": 1,
+          "items": [
+            {
+              "type": "TextBlock",
+              "text": "Arrives",
+              "isSubtle": true,
+              "horizontalAlignment": "Right",
+              "weight": "Bolder",
+              "wrap": true
+            },
+            {
+              "type": "TextBlock",
+              "text": "{{TIME(2017-03-05T08:20:00+04:00)}}",
+              "color": "Attention",
+              "horizontalAlignment": "Right",
+              "weight": "Bolder",
+              "spacing": "Small",
+              "wrap": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

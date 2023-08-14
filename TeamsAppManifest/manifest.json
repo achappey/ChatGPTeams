@@ -1,0 +1,141 @@
+{
+  "$schema": "https://developer.microsoft.com/en-us/json-schemas/teams/v1.14/MicrosoftTeams.schema.json",
+  "manifestVersion": "1.14",
+  "version": "1.0.10",
+  "id": "<<YOUR-MICROSOFT-APP-ID>>",
+  "packageName": "com.achappey.chatgpteams",
+  "developer": {
+    "name": "achappey",
+    "websiteUrl": "https://www.achappey.nl",
+    "privacyUrl": "https://www.achappey.nl/privacy",
+    "termsOfUseUrl": "https://www.achappey.nl/termsofuser"
+  },
+  "icons": {
+    "outline": "icon-outline.png",
+    "color": "icon-color.png"
+  },
+  "name": {
+    "short": "ChatGPTeams",
+    "full": "ChatGPTeams"
+  },
+  "description": {
+    "short": "ChatGPTeams",
+    "full": "ChatGPTeams"
+  },
+  "accentColor": "#FFFFFF",
+  "bots": [
+    {
+      "botId": "<<YOUR-MICROSOFT-APP-ID>>",
+      "scopes": [
+        "personal",
+        "groupchat",
+        "team"
+      ],
+      "isNotificationOnly": false,
+      "supportsCalling": false,
+      "supportsVideo": false,
+      "supportsFiles": true,
+      "commandLists": [
+        {
+          "scopes": [
+            "personal",
+            "groupchat",
+            "team"
+          ],
+          "commands": [
+            {
+              "title": "FaktonGPT",
+              "description": "Welkom bij FaktonGPT"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "composeExtensions": [
+    {
+      "botId": "<<YOUR-MICROSOFT-APP-ID>>",
+      "commands": [
+        {
+          "id": "searchQuery",
+          "context": [
+            "compose",
+            "commandBox"
+          ],
+          "description": "Test command to run query",
+          "title": "Search",
+          "type": "query",
+          "initialRun": true,
+          "parameters": [
+            {
+              "name": "searchQuery",
+              "title": "Zoek dialogen",
+              "description": "Zoek dialogen",
+              "inputType": "text"
+            }
+          ]
+        },
+        {
+          "id": "saveMessage",
+          "type": "action",
+          "context": [
+            "message"
+          ],
+          "description": "Voeg deze dialoog toe aan je bewaarde dialogen",
+          "title": "Bewaar dialoog",
+          "parameters": [
+            {
+              "name": "title",
+              "title": "Naam van deze dialoog",
+              "description": "Een beschrijving zodat je deze dialoog makkelijk terug kan vinden",
+              "inputType": "text"
+            },
+            {
+              "name": "visibility",
+              "title": "Zichtbaarheid",
+              "value": "Owner",
+              "description": "Kies voor wie deze dialoog zichtbaar is",
+              "inputType": "choiceset",
+              "choices": [
+                {
+                  "title": "Eigenaar",
+                  "value": "Owner"
+                },
+                {
+                  "title": "Onderneming",
+                  "value": "Department"
+                },
+                {
+                  "title": "Iedereen",
+                  "value": "Everyone"
+                }
+
+              ]
+            },
+            {
+              "name": "connectAiAssistant",
+              "title": "Verbind AI-assistent",
+              "description": "Verbind deze dialoog met de huidige AI-assistent",
+              "inputType": "toggle"
+            },
+            {
+              "name": "connectFunctions",
+              "title": "Verbind functies",
+              "description": "Verbind deze dialoog met de huidige functies",
+              "inputType": "toggle"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "permissions": [
+    "identity",
+    "messageTeamMembers"
+  ],
+  "validDomains": [ "*.ngrok.io", "token.botframework.com" ],
+  "webApplicationInfo": {
+    "id": "<<YOUR-MICROSOFT-APP-ID>>",
+    "resource": "api://botid-<<YOUR-MICROSOFT-APP-ID>>"
+  }
+}
