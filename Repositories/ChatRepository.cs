@@ -2,19 +2,19 @@ using System;
 using AutoMapper;
 using System.Collections.Generic;
 using System.Linq;
-using System.Threading.Tasks;
 using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Models;
 using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
+using SharpToken;
 
 namespace achappey.ChatGPTeams.Repositories;
 
 public interface IChatRepository
 {
-    Task<Message> ChatAsync(Conversation conversation);
-    Task<Message> ChatWithContextAsync(IEnumerable<EmbeddingScore> items, Conversation conversation);
+    IAsyncEnumerable<Message> ChatStreamAsync(Conversation conversation);
+    IAsyncEnumerable<Message> ChatWithContextStreamAsync(IEnumerable<EmbeddingScore> items, Conversation conversation);
 }
 
 public class ChatRepository : IChatRepository
@@ -48,91 +48,105 @@ public class ChatRepository : IChatRepository
         };
     }
 
-    public async Task<Message> ChatAsync(Conversation conversation)
+    public IAsyncEnumerable<Message> ChatStreamAsync(Conversation conversation)
     {
-        return await ChatWithFallback(conversation);
+        return ChatWithFallback(conversation);
     }
 
-    public async Task<Message> ChatWithContextAsync(IEnumerable<EmbeddingScore> items, Conversation conversation)
+
+    public IAsyncEnumerable<Message> ChatWithContextStreamAsync(IEnumerable<EmbeddingScore> items, Conversation conversation)
     {
-        return await ChatWithBestContextAsync(items, conversation);
+        return ChatWithBestContextStreamAsync(items, conversation);
     }
 
-    private async Task<Message> ChatWithFallback(Conversation chat)
+    private IAsyncEnumerable<Message> ChatWithFallback(Conversation chat)
     {
-        const int maxAttempts = 10;
-        var delay = TimeSpan.FromSeconds(1);
+        int maxTokenSize = chat.Assistant.Model == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
 
-        for (int attempt = 0; attempt < maxAttempts; attempt++)
+        // Calculate the total token size
+        int totalTokenSize = chat.Messages
+            .Select(message => encoding.Encode(message.Content))
+            .Sum(encoded => encoded.Count());
+
+        // Remove oldest messages if the total token size exceeds the maximum
+        while (totalTokenSize > maxTokenSize && chat.Messages.Count > 0)
         {
-            try
-            {
-                if (attempt > 0)
-                {
-                    await Task.Delay(delay);  // Wait before retrying
-                    delay *= 2;  // Increase delay
-                }
-
-                if (chat.Messages.Count() > 0)
-                {
-                    return await AttemptChatAsync(chat);
-                }
-                else
-                {
-                    throw new InvalidOperationException("The chat history could not be shortened further without success.");
-                }
-            }
-            catch (FormatException)
-            {
-                chat.ShortenChatHistory();
-            }
+            var oldestMessage = chat.Messages.First();
+            totalTokenSize -= encoding.Encode(oldestMessage.Content).Count();
+            chat.Messages.RemoveAt(0);
         }
 
-        throw new InvalidOperationException("Exceeded maximum attempts to chat.");
+        return AttemptChatStreamAsync(chat);
     }
 
-    private async Task<Message> AttemptChatAsync(Conversation conversation)
+    private async IAsyncEnumerable<Message> AttemptChatStreamAsync(Conversation conversation)
     {
         var chatCompletionRequest = ToChatCompletionCreateRequest(conversation);
 
-        var response = await _openAIService.ChatCompletion.CreateCompletion(chatCompletionRequest).ConfigureAwait(false);
-
-        if (!response.Successful)
+        await foreach (var response in _openAIService.ChatCompletion.CreateCompletionAsStream(chatCompletionRequest))
         {
-            throw response.Error?.Code switch
-            {
-                "context_length_exceeded" => new FormatException(response.Error.Message),
-                _ => new Exception(response.Error?.Message),
-            };
+            var message = response.Choices.FirstOrDefault()?.Message;
+            yield return _mapper.Map<Message>(message);
         }
-
-        var message = response.Choices.FirstOrDefault()?.Message;
-
-        return _mapper.Map<Message>(message);
     }
 
-
-    private async Task<Message> ChatWithBestContextAsync(IEnumerable<EmbeddingScore> topResults, Conversation chat)
+    private IAsyncEnumerable<Message> ChatWithBestContextStreamAsync(IEnumerable<EmbeddingScore> topResults, Conversation chat)
     {
-        var delayTime = 1000;
+        int maxTokenSize = chat.Assistant.Model == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
 
-        while (topResults.Any())
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
+
+        // Calculate chat history tokens
+        int chatHistoryTokens = chat.Messages
+                .Select(message => encoding.Encode(message.Content))
+                .Sum(encoded => encoded.Count());
+
+        int remainingTokensAfterChat = maxTokenSize - chatHistoryTokens;
+        int reservedTokensForEmbeddings = (remainingTokensAfterChat > maxTokenSize / 2) ? remainingTokensAfterChat : maxTokenSize / 2;
+
+        // If chat history exceeds its 50% quota, trim it
+        while (chatHistoryTokens > maxTokenSize / 2 && chat.Messages.Count > 0)
         {
-            var contextQuery = CreateContextQuery(topResults);
-            chat.Assistant.Prompt += contextQuery;
+            var oldestMessage = chat.Messages.First();
+            chatHistoryTokens -= encoding.Encode(oldestMessage.Content).Count();
+            chat.Messages.RemoveAt(0);
+        }
 
-            try
+        List<EmbeddingScore> selectedEmbeddings = CalculateAndLimitTokens(topResults, reservedTokensForEmbeddings, encoding);
+
+        var contextQuery = CreateContextQuery(selectedEmbeddings);
+        chat.Assistant.Prompt += contextQuery;
+
+        return AttemptChatStreamAsync(chat);
+    }
+
+    private List<EmbeddingScore> CalculateAndLimitTokens(IEnumerable<EmbeddingScore> topResults, int availableTokens, GptEncoding encoding)
+    {
+        int totalEmbeddingTokens = 0;
+        List<EmbeddingScore> selectedEmbeddings = new List<EmbeddingScore>();
+
+        // Iterate through the top results, encoding each one, and summing the token counts
+        foreach (var result in topResults)
+        {
+            string textRepresentation = result.Text;
+            int tokens = encoding.Encode(textRepresentation).Count();
+
+            if (totalEmbeddingTokens + tokens <= availableTokens)
             {
-                return await AttemptChatAsync(chat);
+                selectedEmbeddings.Add(result);
+                totalEmbeddingTokens += tokens;
             }
-            catch (FormatException)
+            else
             {
-                (topResults, delayTime) = await HandleFormatErrorAsync(chat, topResults, delayTime);
+                break; // Stop if adding this result would exceed the available tokens
             }
         }
 
-        throw new Exception("Failed to chat with context.");
+        return selectedEmbeddings;
     }
+
+
 
     private string CreateContextQuery(IEnumerable<EmbeddingScore> topResults)
     {
@@ -147,32 +161,6 @@ public class ChatRepository : IChatRepository
             .OrderByDescending(g => g.BestScore)
             .Select(g => g.Url + " " + g.Texts));
     }
-
-    private async Task<(IEnumerable<EmbeddingScore> TopResults, int DelayTime)> 
-            HandleFormatErrorAsync(Conversation chat, IEnumerable<EmbeddingScore> topResults, int delayTime)
-    {
-        var topResultsCount = topResults.Count();
-
-        try
-        {
-            chat.ShortenChatHistory(10, 5);
-        }
-        catch (InvalidOperationException) { }
-
-        if (topResultsCount > 1)
-        {
-            topResults = topResults.Take(topResultsCount / 2).ToList();
-            await Task.Delay(delayTime);
-            delayTime *= 2;  // Exponential backoff
-        }
-        else
-        {
-            throw new Exception("Failed to chat with context.");
-        }
-
-        return (topResults, delayTime);
-    }
-
 
 
 }

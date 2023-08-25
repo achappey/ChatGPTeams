@@ -24,7 +24,7 @@ namespace achappey.ChatGPTeams.Extensions
     public static class FileExtensions
     {
 
-        public static List<string> ConvertPdfToLines(this byte[] pdfBytes, int maxWordsPerLine = 150)
+        public static List<string> ConvertPdfToLines(this byte[] pdfBytes, int maxWordsPerLine = 250)
         {
             using var stream = new MemoryStream(pdfBytes);
             using var pdfReader = new PdfReader(stream);

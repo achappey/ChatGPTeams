@@ -26,7 +26,7 @@ namespace achappey.ChatGPTeams.Services.Graph
                         .Filter(filter)
                         .GetAsync();
 
-            return pages.Select(t => _mapper.Map<Models.Graph.Page>(t));
+            return pages.Select(_mapper.Map<Models.Graph.Page>);
         }
 
 

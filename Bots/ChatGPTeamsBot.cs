@@ -28,7 +28,8 @@ namespace achappey.ChatGPTeams
 
         protected override async Task OnMembersAddedAsync(IList<ChannelAccount> membersAdded, ITurnContext<IConversationUpdateActivity> turnContext, CancellationToken cancellationToken)
         {
-            await EnsureToken(turnContext, cancellationToken);
+          // await EnsureToken(turnContext, cancellationToken);
+            
             await ShowMenuAsync(turnContext, cancellationToken);
             //await turnContext.SendActivityAsync(MessageFactory.Attachment(ChatCards.CreateHeroCard(turnContext.Activity.Recipient.Name)), cancellationToken);
         }

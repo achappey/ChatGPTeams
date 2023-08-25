@@ -12,8 +12,6 @@ using achappey.ChatGPTeams.Profiles;
 using achappey.ChatGPTeams.Services;
 using achappey.ChatGPTeams.Repositories;
 using OpenAI.Managers;
-using Microsoft.Identity.Client;
-using System;
 
 //ngrok http 3978 --host-header="localhost:3978"
 
@@ -56,7 +54,6 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IFunctionService, FunctionService>();
             services.AddScoped<IDepartmentService, DepartmentService>();
             services.AddScoped<IUserService, UserService>();
-            services.AddScoped<IReactionService, ReactionService>();
             services.AddScoped<IPromptService, PromptService>();
             services.AddScoped<IRequestService, RequestService>();
             services.AddScoped<IFunctionExecutionService, FunctionExecutionService>();
@@ -72,7 +69,6 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IEmbeddingRepository, EmbeddingRepository>();
             services.AddScoped<IResourceRepository, ResourceRepository>();
             services.AddScoped<IConversationRepository, ConversationRepository>();
-            services.AddScoped<IReactionsRepository, ReactionsRepository>();
             services.AddScoped<IFunctionRepository, FunctionRepository>();
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();
             services.AddScoped<IPromptRepository, PromptRepository>();
@@ -97,25 +93,6 @@ namespace achappey.ChatGPTeams
             {
                 ApiKey = appConfig.OpenAI
             }));
-
-            services.AddSingleton(serviceProvider =>
-            {
-                var appConfig = serviceProvider.GetRequiredService<AppConfig>();
-
-                string authority = $"https://login.microsoftonline.com/{appConfig.MicrosoftAppTenantId}";
-
-                IConfidentialClientApplication app = ConfidentialClientApplicationBuilder.Create(appConfig.MicrosoftAppId)
-                    .WithClientSecret(appConfig.MicrosoftAppPassword)
-                    .WithAuthority(new Uri(authority))
-                    .Build();
-
-                string[] scopes = ["https://vault.azure.net/.default"];
-
-                // Note that this is blocking the async call, consider restructuring if needed
-                AuthenticationResult result = app.AcquireTokenForClient(scopes).ExecuteAsync().GetAwaiter().GetResult();
-
-                return new AccessTokenCredential(result.AccessToken);
-            });
 
             services.AddSingleton<UserState>();
 

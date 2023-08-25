@@ -14,7 +14,6 @@ public static class FieldNames
     public const string AICutOff = "CutOff";
     public const string AITemperature = "Temperature";
     public const string AIVisibility = "Visibility";
-    public const string AIReactions = "Reactions";
     public const string AICategory = "Category";
     public const string AIReaders = "Readers";
     public const string AIUrl = "Url";

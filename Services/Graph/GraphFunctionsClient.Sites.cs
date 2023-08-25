@@ -27,7 +27,7 @@ namespace achappey.ChatGPTeams.Services.Graph
                 .Header("ConsistencyLevel", "eventual")
                 .GetAsync();
 
-            return sites.Select(t => _mapper.Map<Models.Graph.Site>(t));
+            return sites.Select(_mapper.Map<Models.Graph.Site>);
         }
 
 

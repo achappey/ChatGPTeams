@@ -26,7 +26,7 @@ namespace achappey.ChatGPTeams.Services.Graph
 
             var insights = await trendingRequest.GetAsync();
 
-            return insights.Select(a => _mapper.Map<Trending>(a));
+            return insights.Select(_mapper.Map<Trending>);
         }
 
         [MethodDescription("Gets used documents for the current user.")]
@@ -44,7 +44,7 @@ namespace achappey.ChatGPTeams.Services.Graph
 
             var insights = await trendingRequest.GetAsync();
 
-            return insights.Select(a => _mapper.Map<UsedInsight>(a));
+            return insights.Select(_mapper.Map<UsedInsight>);
         }
 
         [MethodDescription("Gets documents shared with the current user.")]
@@ -62,7 +62,7 @@ namespace achappey.ChatGPTeams.Services.Graph
 
             var sharedItems = await sharedRequest.GetAsync();
 
-            return sharedItems.Select(a => _mapper.Map<SharedInsight>(a));
+            return sharedItems.Select(_mapper.Map<SharedInsight>);
         }
 
 

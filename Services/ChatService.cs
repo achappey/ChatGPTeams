@@ -11,7 +11,8 @@ namespace achappey.ChatGPTeams.Services;
 public interface IChatService
 {
 
-    Task<Message> SendRequest(ConversationContext context);
+    IAsyncEnumerable<Message> SendRequestStream(Conversation conversation);
+    Task<Conversation> GetChatConversation(ConversationContext context);
 }
 
 public class ChatService : IChatService
@@ -42,29 +43,41 @@ public class ChatService : IChatService
         _cache = cache;
 
     }
-//, Conversation conversation
-    public async Task<Message> SendRequest(ConversationContext context)
+
+    public async Task<Conversation> GetChatConversation(ConversationContext context)
     {
         var conversation = await _conversationRepository.GetByTitle(context.Id);
         conversation.Assistant = await _assistantRepository.Get(conversation.Assistant.Id);
         conversation.Assistant.Prompt += $"{DateTime.Now.ToLocalTime()}";
         conversation.Assistant.Resources = await _resourceRepository.GetByAssistant(conversation.Assistant.Id);
         conversation.FunctionDefinitions = await _functionDefinitonRepository.GetByNames(conversation.AllFunctionNames);
-        conversation.Messages = await _messageService.GetByConversationAsync(context, conversation.Id);
+        conversation.Messages = (await _messageService.GetByConversationAsync(context, conversation.Id)).ToList();
         conversation.Resources = await _resourceRepository.GetByConversation(conversation.Id);
-        
-        if (conversation.Resources.Count() > 0)
-        {
-            return await ChatWithEmbeddings(conversation);
-        }
 
-        var result = await _chatRepository.ChatAsync(conversation);
-        result.Reference = conversation.Messages.Last().Reference;
-
-        return result;
+        return conversation;
     }
 
-    private async Task<Message> ChatWithEmbeddings(Conversation conversation)
+    public async IAsyncEnumerable<Message> SendRequestStream(Conversation conversation)
+    {
+        if (conversation.AllResources.Count() > 0)
+        {
+            await foreach (var message in ChatWithEmbeddingsStream(conversation))
+            {
+                message.Reference = conversation.Messages.Last().Reference;
+                yield return message;
+            }
+        }
+        else
+        {
+            await foreach (var message in _chatRepository.ChatStreamAsync(conversation))
+            {
+                message.Reference = conversation.Messages.Last().Reference;
+                yield return message;
+            }
+        }
+    }
+
+    private async IAsyncEnumerable<Message> ChatWithEmbeddingsStream(Conversation conversation)
     {
         var queryEmbedding = await _embeddingRepository.GetEmbeddingFromTextAsync(conversation.Messages.Last().Content);
         var results = new List<EmbeddingScore>();
@@ -104,11 +117,11 @@ public class ChatService : IChatService
             }
         }
 
-        var topItems = results.OrderByDescending(a => a.Score).Take(50);
+        var topItems = results.OrderByDescending(a => a.Score).Take(400);
 
-        var result = await _chatRepository.ChatWithContextAsync(topItems, conversation);
-        result.Reference = conversation.Messages.Last().Reference;
-
-        return result;
+        await foreach (var message in _chatRepository.ChatWithContextStreamAsync(topItems, conversation))
+        {
+            yield return message;
+        }
     }
 }

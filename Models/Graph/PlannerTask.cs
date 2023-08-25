@@ -11,6 +11,20 @@ public class PlannerTask
     public PlannerTaskDetails Details { get; set; }
     public DateTimeOffset? CompletedDateTime { get; set; }
     public DateTimeOffset? DueDateTime { get; set; }
+    public int? PercentComplete { get; set; }
+    
+}
+
+public class PlannerBucket
+{
+    public string Name { get; set; }
+    public string Id { get; set; }
+}
+
+public class PlannerPlan
+{
+    public string Title { get; set; }
+    public string Id { get; set; }
 }
 
 public class PlannerTaskDetails

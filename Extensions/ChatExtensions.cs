@@ -326,7 +326,7 @@ namespace achappey.ChatGPTeams.Extensions
 
             if (toRemove > 0)
             {
-                chat.Messages = messages.Skip(toRemove);
+                chat.Messages = messages.Skip(toRemove).ToList();
             }
             else
             {
@@ -340,8 +340,6 @@ namespace achappey.ChatGPTeams.Extensions
         {
              {FieldNames.AIRole, message.Role.ToString()},
                 {FieldNames.AITeamsId, message.TeamsId},
-                {FieldNames.AIReactions.ToLookupField() + "@odata.type", "Collection(Edm.Int32)"},
-                {FieldNames.AIReactions.ToLookupField(), message.Reactions?.Select(a => a.Id.ToInt())},
                 {FieldNames.AIContent, message.Content},
                 {FieldNames.AIReference, JsonConvert.SerializeObject(message.Reference)},
                 {FieldNames.Title, message.Name},

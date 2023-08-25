@@ -16,6 +16,8 @@ public class GraphProfile : Profile
         CreateMap<Microsoft.Graph.Message, Models.Graph.Email>();
         CreateMap<Microsoft.Graph.Recipient, Models.Graph.Recipient>();
         CreateMap<Microsoft.Graph.PlannerTask, Models.Graph.PlannerTask>();
+        CreateMap<Microsoft.Graph.PlannerPlan, Models.Graph.PlannerPlan>();
+        CreateMap<Microsoft.Graph.PlannerBucket, Models.Graph.PlannerBucket>();
         CreateMap<Microsoft.Graph.PlannerTaskDetails, Models.Graph.PlannerTaskDetails>();
         CreateMap<Microsoft.Graph.Channel, Models.Graph.Channel>();
         CreateMap<Microsoft.Graph.Trending, Models.Graph.Trending>();
@@ -65,8 +67,6 @@ public class GraphProfile : Profile
 
         CreateMap<Microsoft.Graph.Chat, Models.Graph.TeamsChat>()
                .ForMember(dest => dest.Members, opt => opt.MapFrom(src => string.Join(",", src.Members.Select(m => m.DisplayName))));
-
-
     }
 
     public class AttachmentToResourcesConverter : ITypeConverter<Microsoft.Bot.Schema.Attachment, IEnumerable<Resource>>

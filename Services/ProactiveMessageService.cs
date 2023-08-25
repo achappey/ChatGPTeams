@@ -15,6 +15,7 @@ namespace achappey.ChatGPTeams.Services;
 public interface IProactiveMessageService
 {
     Task<string> SendMessageAsync(ConversationReference conversationReference, string message, CancellationToken cancellationToken);
+    Task<string> UpdateMessageAsync(ConversationReference conversationReference, string message, string replyId, CancellationToken cancellationToken);
 
     Task SelectAssistantAsync(ConversationReference conversationReference,
         Conversation conversation,
@@ -110,8 +111,32 @@ public class ProactiveMessageService : IProactiveMessageService
 
         await _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
         {
+
             var response = await turnContext.SendActivityAsync(message);
             activityId = response.Id;
+        }, cancellationToken);
+
+        return activityId;
+    }
+
+     public async Task<string> UpdateMessageAsync(ConversationReference conversationReference, string message, string replyId, CancellationToken cancellationToken)
+    {
+        string activityId = null;
+
+        await _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
+        {
+            var activityToUpdate = new Activity()
+        {
+            Id = replyId,
+            Type = ActivityTypes.Message,
+            Text = message
+        };
+
+        await turnContext.UpdateActivityAsync(activityToUpdate, cancellationToken);
+
+         //   var response = await turnContext.SendActivityAsync(message);
+          //  response.Id = replyId;
+            //activityId = response.Id;
         }, cancellationToken);
 
         return activityId;

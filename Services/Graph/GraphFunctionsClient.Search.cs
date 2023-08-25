@@ -12,29 +12,27 @@ namespace achappey.ChatGPTeams.Services.Graph
     {
 
         [MethodDescription("Searches across SharePoint and OneDrive resources.")]
-        public async Task<IEnumerable<achappey.ChatGPTeams.Models.Graph.SearchHit>> SearchDriveContent(
+        public async Task<IEnumerable<Models.Graph.SearchHit>> SearchDriveContent(
             [ParameterDescription("The search query.")] string query)
         {
             return await SearchContent(query, EntityType.DriveItem);
-
-            //ret//urn result.Select(a => this._mapper.Map<achappey.ChatGPTeams.Models.Graph.SearchHit>(a));
         }
 
         [MethodDescription("Searches Outlook messages.")]
-        public async Task<IEnumerable<achappey.ChatGPTeams.Models.Graph.SearchHit>> SearchOutlookContent(
+        public async Task<IEnumerable<Models.Graph.SearchHit>> SearchOutlookContent(
                     [ParameterDescription("The search query.")] string query)
         {
             return await SearchContent(query, EntityType.Message);
         }
 
         [MethodDescription("Searches chat messages.")]
-        public async Task<IEnumerable<achappey.ChatGPTeams.Models.Graph.SearchHit>> SearchChatContent(
+        public async Task<IEnumerable<Models.Graph.SearchHit>> SearchChatContent(
                           [ParameterDescription("The search query.")] string query)
         {
             return await SearchContent(query, EntityType.ChatMessage);
         }
 
-        private async Task<IEnumerable<achappey.ChatGPTeams.Models.Graph.SearchHit>> SearchContent(
+        private async Task<IEnumerable<Models.Graph.SearchHit>> SearchContent(
                           string query, EntityType type)
         {
             var graphClient = GetAuthenticatedClient();
@@ -61,8 +59,7 @@ namespace achappey.ChatGPTeams.Services.Graph
                 .Top(10)
                 .PostAsync();
 
-         //   return searchResponse.FirstOrDefault().HitsContainers.FirstOrDefault().Hits;
-            return searchResponse.FirstOrDefault().HitsContainers.FirstOrDefault().Hits.Select(a => this._mapper.Map<achappey.ChatGPTeams.Models.Graph.SearchHit>(a));
+            return searchResponse.FirstOrDefault().HitsContainers.FirstOrDefault().Hits.Select(a => _mapper.Map<Models.Graph.SearchHit>(a));
         }
 
 

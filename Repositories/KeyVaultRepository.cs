@@ -3,12 +3,13 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Azure.Security.KeyVault.Secrets;
 using Microsoft.Extensions.Logging;
+using Microsoft.Identity.Client;
 
 namespace achappey.ChatGPTeams.Repositories;
+
 public interface IKeyVaultRepository
 {
     Task<KeyVaultSecret> GetSecret(string vault, string name);
-
     Task<IEnumerable<string>> GetSecrets(string vault);
     Task<string> CreateSecret(string vault, string name, string value, string contentType);
     Task UpdateSecret(string vault, string name, string newValue);
@@ -18,20 +19,36 @@ public interface IKeyVaultRepository
 public class KeyVaultRepository : IKeyVaultRepository
 {
     private readonly ILogger<KeyVaultRepository> _logger;
-    private readonly AccessTokenCredential _accessTokenCredential;
+    private readonly AppConfig _appConfig;
 
-    public KeyVaultRepository(ILogger<KeyVaultRepository> logger,
-        AccessTokenCredential accessTokenCredential)
+    public KeyVaultRepository(ILogger<KeyVaultRepository> logger, AppConfig appConfig)
     {
         _logger = logger;
-        _accessTokenCredential = accessTokenCredential;
+        _appConfig = appConfig;
     }
 
     private SecretClient GetSecretClient(string vault)
     {
         var kvUri = $"https://{vault}.vault.azure.net";
 
-        return new SecretClient(new Uri(kvUri), _accessTokenCredential);
+        return new SecretClient(new Uri(kvUri), GetAccessTokenCredential());
+    }
+
+    public AccessTokenCredential GetAccessTokenCredential()
+    {
+        string authority = $"https://login.microsoftonline.com/{_appConfig.MicrosoftAppTenantId}";
+
+        var app = ConfidentialClientApplicationBuilder.Create(_appConfig.MicrosoftAppId)
+            .WithClientSecret(_appConfig.MicrosoftAppPassword)
+            .WithAuthority(new Uri(authority))
+            .Build();
+
+        string[] scopes = new List<string>() { "https://vault.azure.net/.default" }.ToArray();
+
+        // Note that this is blocking the async call, consider restructuring if needed
+        AuthenticationResult result = app.AcquireTokenForClient(scopes).ExecuteAsync().GetAwaiter().GetResult();
+
+        return new AccessTokenCredential(result.AccessToken);
     }
 
     public async Task<KeyVaultSecret> GetSecret(string vault, string name)
@@ -65,7 +82,7 @@ public class KeyVaultRepository : IKeyVaultRepository
         }
 
         var updated = await client.SetSecretAsync(name, newValue);
-        
+
         updated.Value.Properties.ContentType = currentSecret.Value.Properties.ContentType;
 
         await client.UpdateSecretPropertiesAsync(updated.Value.Properties);
@@ -74,7 +91,7 @@ public class KeyVaultRepository : IKeyVaultRepository
     public async Task DeleteSecret(string vault, string name)
     {
         var client = GetSecretClient(vault);
-        
+
         await client.StartDeleteSecretAsync(name);
     }
 

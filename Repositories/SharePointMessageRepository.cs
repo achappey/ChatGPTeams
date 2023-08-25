@@ -27,7 +27,7 @@ public class SharePointMessageRepository : ISharePointMessageRepository
     private readonly ILogger<SharePointMessageRepository> _logger;
     private readonly IMapper _mapper;
     private readonly IGraphClientFactory _graphClientFactory;
-    private readonly string _selectQuery = $"{FieldNames.AIRole},{FieldNames.AIContent},{FieldNames.AIFunction.ToLookupField()},{FieldNames.AIConversation.ToLookupField()},{FieldNames.AIArguments},{FieldNames.AITeamsId},{FieldNames.Title},{FieldNames.AIReference},{FieldNames.AIReactions},{FieldNames.Created}";
+    private readonly string _selectQuery = $"{FieldNames.AIRole},{FieldNames.AIContent},{FieldNames.AIFunction.ToLookupField()},{FieldNames.AIConversation.ToLookupField()},{FieldNames.AIArguments},{FieldNames.AITeamsId},{FieldNames.Title},{FieldNames.AIReference},{FieldNames.Created}";
 
     public SharePointMessageRepository(ILogger<SharePointMessageRepository> logger,
     AppConfig config, IMapper mapper,

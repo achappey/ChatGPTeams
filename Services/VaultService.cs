@@ -22,14 +22,16 @@ public class VaultService : IVaultService
     private readonly IVaultRepository _vaultRepository;
     private readonly IKeyVaultRepository _keyVaultRepository;
     private readonly IUserRepository _userRepository;
+    private readonly AppConfig _appConfig;
     private readonly IGraphClientFactory _graphClientFactory;
 
-    public VaultService(IVaultRepository vaultRepository, IGraphClientFactory graphClientFactory,
+    public VaultService(IVaultRepository vaultRepository, IGraphClientFactory graphClientFactory, AppConfig appConfig,
         IKeyVaultRepository keyVaultRepository, IUserRepository userRepository)
     {
         _vaultRepository = vaultRepository;
         _keyVaultRepository = keyVaultRepository;
         _userRepository = userRepository;
+        _appConfig = appConfig;
         _graphClientFactory = graphClientFactory;
     }
 
@@ -40,6 +42,7 @@ public class VaultService : IVaultService
             return _graphClientFactory.Create();
         }
     }
+
 
     public async Task<IEnumerable<Vault>> GetMyVaultsAsync()
     {

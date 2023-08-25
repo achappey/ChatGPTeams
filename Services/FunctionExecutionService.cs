@@ -230,9 +230,9 @@ public class FunctionExecutionService : IFunctionExecutionService
         throw new KeyNotFoundException();
     }
 
-    private Models.Response SuccessResponse()
+    private Response SuccessResponse()
     {
-        return new Models.Response
+        return new Response
         {
             Status = "success",
             Message = "The function was executed successfully.",

@@ -239,7 +239,7 @@ namespace achappey.ChatGPTeams.Services.Graph
 
             return messages
                 .Take(10)
-                .Select(a => _mapper.Map<Models.Graph.Email>(a));
+                .Select(_mapper.Map<Models.Graph.Email>);
         }
 
         // Search for teams based on team name or description.

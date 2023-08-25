@@ -284,6 +284,26 @@ namespace achappey.ChatGPTeams.Services.Graph
             return SuccessResponse();
         }
 
+        [MethodDescription("Creates a new channel within the specified Microsoft Teams.")]
+        public async Task<Models.Graph.Channel> CreateChannel(
+            [ParameterDescription("The ID of the Microsoft Teams team to create the channel in.")] string teamId,
+            [ParameterDescription("The name of the channel.")] string channelName,
+            [ParameterDescription("The description of the channel.")] string channelDescription = null)
+        {
+            var graphClient = GetAuthenticatedClient();
+
+            var newChannel = new Microsoft.Graph.Channel
+            {
+                DisplayName = channelName,
+                Description = channelDescription
+            };
+
+            var createdChannel = await graphClient.Teams[teamId].Channels
+                                    .Request()
+                                    .AddAsync(newChannel);
+
+            return _mapper.Map<Models.Graph.Channel>(createdChannel);
+        }
 
     }
 }

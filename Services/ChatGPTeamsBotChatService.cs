@@ -5,20 +5,13 @@ using AutoMapper;
 using achappey.ChatGPTeams.Models;
 using System.Linq;
 using Microsoft.Bot.Schema;
-using achappey.ChatGPTeams.Extensions;
+using System.Text;
 
 namespace achappey.ChatGPTeams.Services;
 
 public interface IChatGPTeamsBotChatService
 {
-    Task OnChatReactionAdded(ConversationContext context,
-                             ConversationReference reference,
-                             string reaction,
-                             CancellationToken cancellationToken);
-    Task OnChatReactionRemoved(ConversationContext context,
-                               ConversationReference reference,
-                               string reaction,
-                               CancellationToken cancellationToken);
+ 
     Task ProcessMessageAsync(ConversationContext context,
                              Message message,
                              CancellationToken cancellationToken);
@@ -27,16 +20,17 @@ public interface IChatGPTeamsBotChatService
     Task DeleteMessageAsync(ConversationContext context,
                            ConversationReference reference,
                            string teamsId,
-                           CancellationToken cancellationToken);   
+                           CancellationToken cancellationToken);
     Task ProcessAttachmentsAsync(ConversationContext context,
                                  ConversationReference reference,
                                  IEnumerable<Attachment> attachments,
                                  CancellationToken cancellationToken);
     Task EnsureConversationByReferenceAsync(ConversationReference reference);
     Task DeleteConversationByReferenceAsync(ConversationReference reference);
+
     Task ExecuteCustomPrompt(ConversationContext context, ConversationReference reference, string promptId, Message message, string user, string replyToId,
           CancellationToken cancellationToken);
-      
+
 
 }
 
@@ -83,7 +77,6 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
 
     private async Task ExecuteFunctionAsync(ConversationContext context,
                                             ConversationReference reference,
-                                           // Conversation conversation,
                                             FunctionCall functionCall,
                                             CancellationToken cancellationToken)
     {
@@ -103,43 +96,9 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
             await _proactiveMessageService.FunctionExecutedAsync(reference, function, functionCall, result, executionCardId, cancellationToken);
         }
 
-        await ProcessChatAsync(context, reference, cancellationToken); // Continue processing the chat conversation
+        await ProcessChatStreamAsync(context, reference, cancellationToken); // Continue processing the chat conversation
     }
 
-    public async Task OnChatReactionRemoved(ConversationContext context,
-                                            ConversationReference reference,
-                                            string reaction,
-                                            CancellationToken cancellationToken)
-    {
-        await _messageService.DeleteReactionFromMessage(reaction, reference);
-
-    }
-
-    public async Task OnChatReactionAdded(ConversationContext context,
-                                          ConversationReference reference,
-                                          string reaction,
-                                          CancellationToken cancellationToken)
-    {
-        await _messageService.AddReactionToMessage(new Reaction() { Title = reaction }, reference);
-        var user = await _userService.GetByAadObjectId(reference.User.AadObjectId);
-
-        var messageId = await _messageService.CreateMessageAsync(new Message()
-        {
-            Role = Role.user,
-            Reference = reference,
-            Content = user.DisplayName + " heeft gereageerd met " + reaction,
-            ConversationId = reference.Conversation.Id,
-        });
-
-        var result = await _chatService.SendRequest(context);
-
-        await _proactiveMessageService.SendMessageAsync(reference, result.Content, cancellationToken);
-
-        await _messageService.DeleteMessageById(messageId);
-
-    }
-
-  
     public async Task ProcessMessageAsync(ConversationContext context, Message message, CancellationToken cancellationToken)
     {
         if (message.Reference.Conversation.ConversationType == "personal")
@@ -147,31 +106,70 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
             await _messageService.CreateMessageAsync(message);
         }
 
-        await ProcessChatAsync(context, message.Reference, cancellationToken);
+        await ProcessChatStreamAsync(context, message.Reference, cancellationToken);
     }
 
-    private async Task ProcessChatAsync(ConversationContext context,
-                                        ConversationReference reference,
-                                        CancellationToken cancellationToken)
+    private async Task ProcessChatStreamAsync(ConversationContext context,
+                                              ConversationReference reference,
+                                              CancellationToken cancellationToken)
     {
-        var conversation = await _conversationService.GetConversationByContextAsync(context); // Retrieve the conversation using the context
-        var result = await _chatService.SendRequest(context); // Send request using the chat service
+        bool isFirstMessage = true;
+        string messageId = null;
+        StringBuilder accumulatedContent = new StringBuilder();
+        Message completeMessage = null;
+        var conversation = await _chatService.GetChatConversation(context);
+        int accumulatedMessageCount = 0;
 
-        if (!string.IsNullOrEmpty(result.Content)) // Check if the result content is not empty
+        await foreach (var message in _chatService.SendRequestStream(conversation)) // Process each message in the stream
         {
-            result.TeamsId = await _proactiveMessageService.SendMessageAsync(reference, result.Content, cancellationToken); // Send proactive message
+            if (!string.IsNullOrEmpty(message.Content))
+            {
+                accumulatedContent.Append(message.Content);
+                accumulatedMessageCount++;
+
+                // If message content is not empty, send proactive message
+                if (isFirstMessage)
+                {
+                    // Logic to update the card goes here. For example:
+                    message.TeamsId = await _proactiveMessageService.SendMessageAsync(reference, accumulatedContent.ToString(), cancellationToken);
+                    messageId = message.TeamsId;
+                    isFirstMessage = false; // Reset flag
+                }
+                else if (accumulatedMessageCount >= 20)
+                {
+                    // Update the message if we've accumulated 20 or more
+                    message.TeamsId = await _proactiveMessageService.UpdateMessageAsync(reference, accumulatedContent.ToString(), messageId, cancellationToken);
+                    accumulatedMessageCount = 0;  // Reset the accumulated message count
+                }
+
+                if (completeMessage == null)
+                {
+                    completeMessage = message;
+                }
+            }
+
+            if (message.FunctionCall != null)
+            {
+                // If there's a function call in the message, execute it
+                await ExecuteFunctionAsync(context, reference, message.FunctionCall, cancellationToken);
+            }
         }
 
-        if (reference.Conversation.ConversationType == "personal" && !string.IsNullOrEmpty(result.Content)) // Check if conversation is personal and result content is not empty
+        // If there are any remaining messages that were not batched to 20, update the card with them
+        if (accumulatedMessageCount > 0 && !isFirstMessage)
         {
-            await _messageService.CreateMessageAsync(result); // Create a message for personal conversation
+            await _proactiveMessageService.UpdateMessageAsync(reference, accumulatedContent.ToString(), messageId, cancellationToken);
         }
 
-        if (result.FunctionCall != null) // Check if there's a function call in the result
+        if (reference.Conversation.ConversationType == "personal" && !string.IsNullOrEmpty(accumulatedContent.ToString()))
         {
+            completeMessage.Content = accumulatedContent.ToString();
+            completeMessage.Reference = reference;
+            completeMessage.ConversationId = reference.Conversation.Id;
+            completeMessage.Role = Role.assistant;
 
-
-            await ExecuteFunctionAsync(context, reference, result.FunctionCall, cancellationToken);
+            // If conversation is personal and message content is not empty, save the message
+            await _messageService.CreateMessageAsync(completeMessage);
         }
     }
 
@@ -187,10 +185,6 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
 
         foreach (var item in items)
         {
-            //  if (item.Name.StartsWith("https://") && item.Name.IsSharePointUrl()) // Check if the resource is a SharePoint URL
-            //  {
-            //    item.Name = await _resourceService.GetFileName(item); // Get the file name if it is a SharePoint URL
-            // }
 
             var cardId = await _proactiveMessageService.ImportResourceAsync(reference, item, cancellationToken); // Import the resource
             var lineCount = await _resourceService.ImportResourceAsync(reference, item); // Get the line count of the resource

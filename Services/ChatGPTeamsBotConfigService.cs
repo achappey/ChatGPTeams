@@ -5,7 +5,6 @@ using AutoMapper;
 using achappey.ChatGPTeams.Models;
 using System.Linq;
 using Microsoft.Bot.Schema;
-using achappey.ChatGPTeams.Extensions;
 
 namespace achappey.ChatGPTeams.Services;
 
@@ -94,13 +93,7 @@ public interface IChatGPTeamsBotConfigService
 
     Task<Prompt> GetPrompt(string id);
 
-    Task ClearHistoryAsync(ConversationContext context,
-                           ConversationReference reference,
-                           int skip,
-                           string titleFilter,
-                           string ownerFilter,
-                           Visibility? visibilityFilter,
-                           CancellationToken cancellationToken);
+    Task ClearHistoryAsync(ConversationContext context);
 
     Task EnsureConversation(ConversationReference reference);
 
@@ -335,14 +328,10 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         await SelectResourcesAsync(context, reference, context.ReplyToId, cancellationToken);
     }
 
-    public async Task ClearHistoryAsync(ConversationContext context,
-        ConversationReference reference, int skip, string titleFilter,
-                               string ownerFilter, Visibility? visibilityFilter,
-               CancellationToken cancellationToken)
+    public async Task ClearHistoryAsync(ConversationContext context)
     {
         await _conversationService.ClearConversationHistoryAsync(context, null);
 
-        await SelectPromptsAsync(context, reference, skip, context.ReplyToId, titleFilter, ownerFilter, visibilityFilter, cancellationToken);
     }
 
     public async Task SavePromptAsync(ConversationContext context,
@@ -408,8 +397,6 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
     {
         var assistants = await _assistantService.GetMyAssistants();
         var functions = await _functionService.GetAllFunctionsAsync();
-
-        // var availableFunctions = functions.Where(a => !prompt.Functions.Any(r => r.Name == a.Name));
 
         await _proactiveMessageService.EditPromptAsync(reference, prompt, assistants,
                 functions, replyToId, cancellationToken);

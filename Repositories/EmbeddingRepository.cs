@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
+using SharpToken;
 
 namespace achappey.ChatGPTeams.Repositories;
 
@@ -38,35 +39,41 @@ public class EmbeddingRepository : IEmbeddingRepository
 
     public async Task<IEnumerable<byte[]>> GetEmbeddingsFromLinesAsync(IEnumerable<string> lines)
     {
-        const int maxBatchSize = 2000;
-        int batchSize = Math.Min(maxBatchSize, lines.Count());
-        int suffix = 1;
+        const int maxTokenSize = 8191;
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
         var files = new List<byte[]>();
+        var currentBatch = new List<string>();
+        int currentTokenSize = 0;
 
-        while (lines.Any())
+        foreach (var line in lines)
         {
-            try
-            {
-                List<string> currentBatch = lines.Take(batchSize).ToList();
-                byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
+            int lineTokenSize = encoding.Encode(line).Count();
 
-                files.Add(embeddings);
-                lines = lines.Skip(batchSize).ToList();
-                suffix++;
-                batchSize = Math.Min(maxBatchSize, lines.Count());
-            }
-            catch (Exception)
+            if (currentTokenSize + lineTokenSize > maxTokenSize)
             {
-                batchSize = Math.Max(1, batchSize / 2);
-                if (batchSize == 1)
-                {
-                    break;
-                }
+                // Process the current batch since adding the current line would exceed the max token size
+                byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
+                files.Add(embeddings);
+
+                // Start a new batch
+                currentBatch.Clear();
+                currentTokenSize = 0;
             }
+
+            currentBatch.Add(line);
+            currentTokenSize += lineTokenSize;
+        }
+
+        // Process any remaining lines in the current batch
+        if (currentBatch.Any())
+        {
+            byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
+            files.Add(embeddings);
         }
 
         return files;
     }
+
 
     private async Task<byte[]> CalculateEmbeddingAsync(object input)
     {

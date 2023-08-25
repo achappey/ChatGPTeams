@@ -90,7 +90,6 @@ public class SharePointProfile : AutoMapper.Profile
                .ForMember(dest => dest.TeamsId, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AITeamsId)))
                .ForMember(dest => dest.Reference, opt => opt.MapFrom(src => JsonConvert.DeserializeObject<ConversationReference>(src.GetFieldValue(FieldNames.AIReference))))
                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.ToMessageName()))
-               .ForMember(dest => dest.Reactions, opt => opt.MapFrom(src => src.GetFieldValues(FieldNames.AIReactions).Select(a => a.ToReaction())))
                .ForMember(dest => dest.FunctionCall, opt => opt.MapFrom(src => src.GetFunctionCall()))
                .ForMember(dest => dest.Created, opt => opt.MapFrom(src => DateTimeOffset.Parse(src.GetFieldValue(FieldNames.Created))))
                .ForMember(dest => dest.Content, opt => opt.MapFrom(src => src.Fields.AdditionalData.ContainsKey(FieldNames.AIContent)

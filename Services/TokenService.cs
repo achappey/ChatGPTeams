@@ -14,7 +14,7 @@ public class TokenService : ITokenService
     {
         if (_token == null)
         {
-            throw new Exception("Token not set");
+        //    throw new Exception("Token not set");
         }
         
         return _token;
