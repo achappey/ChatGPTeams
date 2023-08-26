@@ -165,7 +165,8 @@ namespace achappey.ChatGPTeams
                             // Regular expression to detect placeholders:
                             // - Words in curly brackets separated by pipes for dropdowns
                             // - Words enclosed in single or double curly brackets for text inputs
-                            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}";
+                            // - {fieldname|date} for date picker input
+                            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}|\{(\w+)\&date\}";
                             var matches = Regex.Matches(sourcePrompt, regexPattern);
 
                             foreach (var property in data.Properties())
@@ -186,10 +187,15 @@ namespace achappey.ChatGPTeams
                                         {
                                             sourcePrompt = sourcePrompt.Replace(match.Value, value);
                                         }
+                                        else if (match.Groups[4].Success && match.Groups[4].Value == placeholder) // Date picker format
+                                        {
+                                            sourcePrompt = sourcePrompt.Replace(match.Value, value);
+                                        }
                                     }
                                 }
                             }
-                   
+
+
                             var message = _mapper.Map<Message>(turnContext.Activity);
 
                             message.Content = sourcePrompt;

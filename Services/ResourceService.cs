@@ -48,35 +48,6 @@ public class ResourceService : IResourceService
         return assistantResources.Concat(resources);
     }
 
-    //  public async Task<IEnumerable<Resource>> AddResourceToConversation(string Conversation conversation)
-    // {
-    //  return await _resourceRepository.GetByConversation(conversation.Id);
-    //}
-    /*
-        public async Task ProcessAttachmentsAsync(ConversationContext context,
-                                                  ConversationReference reference,
-                                                  IEnumerable<Attachment> attachments)
-        {
-            var items = attachments.SelectMany(a => _mapper.Map<IEnumerable<Resource>>(a))
-                                    .Where(a => !string.IsNullOrEmpty(a.Url) && !string.IsNullOrEmpty(a.Name))
-                                    .GroupBy(a => a.Url)
-                                    .Select(g => g.First()); 
-
-            foreach (var item in items)
-            {
-                if (item.Name.StartsWith("https://") && item.Name.IsSharePointUrl()) // Check if the resource is a SharePoint URL
-                {
-                    item.Name = await _resourceService.GetFileName(item); // Get the file name if it is a SharePoint URL
-                }
-
-                var cardId = await _proactiveMessageService.ImportResourceAsync(reference, item, cancellationToken); // Import the resource
-                var lineCount = await _resourceService.ImportResourceAsync(reference, item); // Get the line count of the resource
-
-                await _proactiveMessageService.ImportResourceFinishedAsync(reference, item, lineCount, cardId, cancellationToken); // Signal the completion of the import
-            }
-        }*/
-
-
     public async Task<string> GetFileName(Resource resource)
     {
         return await _resourceRepository.GetFileName(resource);

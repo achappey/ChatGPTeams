@@ -73,7 +73,8 @@ namespace achappey.ChatGPTeams.Cards
             // Regular expression to detect placeholders:
             // - Words in curly brackets separated by pipes for dropdowns
             // - Words enclosed in single or double curly brackets for text inputs
-            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}";
+            // - {fieldname|date} for date picker input
+            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}|\{(\w+)\&date\}";
             var matches = Regex.Matches(prompt, regexPattern);
 
             // Use a HashSet to store unique placeholders
@@ -81,47 +82,61 @@ namespace achappey.ChatGPTeams.Cards
 
             foreach (Match match in matches.Cast<Match>())
             {
+                // Check if the placeholder is for a date picker
+                if (match.Groups[4].Success)
+                {
+                    string dateLabel = match.Groups[4].Value;
+
+                    if (!addedPlaceholders.Contains(dateLabel))
+                    {
+                        addedPlaceholders.Add(dateLabel);
+
+                        card.Body.Add(new AdaptiveDateInput()
+                        {
+                            Id = dateLabel,
+                            Placeholder = "Selecteer een " + dateLabel
+                        });
+                    }
+                }
                 // Check if the placeholder is for a dropdown (curly brackets with pipes)
-                if (match.Groups[2].Success && match.Groups[3].Success)
+                else if (match.Groups[2].Success && match.Groups[3].Success)
                 {
                     string dropdownLabel = match.Groups[2].Value;
                     string[] options = match.Groups[3].Value.Split('|');
 
-                    // Skip if already added
-                    if (addedPlaceholders.Contains(dropdownLabel))
-                        continue;
-
-                    addedPlaceholders.Add(dropdownLabel);
-
-                    card.Body.Add(new AdaptiveChoiceSetInput
+                    if (!addedPlaceholders.Contains(dropdownLabel))
                     {
-                        Id = dropdownLabel,
-                        Placeholder = "Selecteer een " +  dropdownLabel,
-                        Choices = options.Select(o => new AdaptiveChoice { Title = o, Value = o }).ToList(),
-                        Style = AdaptiveChoiceInputStyle.Compact,
-                        IsRequired = true
-                    });
+                        addedPlaceholders.Add(dropdownLabel);
+
+                        card.Body.Add(new AdaptiveChoiceSetInput
+                        {
+                            Id = dropdownLabel,
+                            Placeholder = "Selecteer een " + dropdownLabel,
+                            Choices = options.Select(o => new AdaptiveChoice { Title = o, Value = o }).ToList(),
+                            Style = AdaptiveChoiceInputStyle.Compact,
+                            IsRequired = true
+                        });
+                    }
                 }
                 else
                 {
                     // Create an input field for each unique matching word
                     string inputLabel = match.Groups[1].Value;
 
-                    // Skip the placeholder if it has already been added
-                    if (addedPlaceholders.Contains(inputLabel))
-                        continue;
-
-                    addedPlaceholders.Add(inputLabel); // Remember the placeholder we added
-
-                    bool isMultiLine = match.Value.StartsWith("{{") && match.Value.EndsWith("}}");
-
-                    card.Body.Add(new AdaptiveTextInput
+                    if (!addedPlaceholders.Contains(inputLabel))
                     {
-                        Id = inputLabel,
-                        Placeholder = inputLabel,
-                        IsRequired = true,
-                        IsMultiline = isMultiLine // Set to true if surrounded by double curly brackets
-                    });
+                        addedPlaceholders.Add(inputLabel);
+
+                        bool isMultiLine = match.Value.StartsWith("{{") && match.Value.EndsWith("}}");
+
+                        card.Body.Add(new AdaptiveTextInput
+                        {
+                            Id = inputLabel,
+                            Placeholder = inputLabel,
+                            IsRequired = true,
+                            IsMultiline = isMultiLine // Set to true if surrounded by double curly brackets
+                        });
+                    }
                 }
             }
 
