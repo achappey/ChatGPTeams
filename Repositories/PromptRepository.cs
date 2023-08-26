@@ -26,7 +26,7 @@ public class PromptRepository : IPromptRepository
     private readonly ILogger<PromptRepository> _logger;
     private readonly IMapper _mapper;
     private readonly IGraphClientFactory _graphClientFactory;
-    private readonly string _selectQuery = $"{FieldNames.AIVisibility},{FieldNames.Title},{FieldNames.AIPrompt},{FieldNames.AIAssistant},{FieldNames.AIAssistant.ToLookupField()},{FieldNames.AIOwner.ToLookupField()},{FieldNames.AIDepartment.ToLookupField()},{FieldNames.AIDepartment},{FieldNames.AIOwner},{FieldNames.AIFunctions}";
+    private readonly string _selectQuery = $"{FieldNames.AIVisibility},{FieldNames.Title},{FieldNames.AICategory},{FieldNames.AIPrompt},{FieldNames.AIAssistant},{FieldNames.AIAssistant.ToLookupField()},{FieldNames.AIOwner.ToLookupField()},{FieldNames.AIDepartment.ToLookupField()},{FieldNames.AIDepartment},{FieldNames.AIOwner},{FieldNames.AIFunctions}";
 
     public PromptRepository(ILogger<PromptRepository> logger,
     AppConfig config, IMapper mapper,
@@ -101,6 +101,7 @@ public class PromptRepository : IPromptRepository
         {
             {FieldNames.Title, prompt.Title },
             {FieldNames.AIPrompt, prompt.Content},
+            {FieldNames.AICategory, prompt.Category},
             {FieldNames.AIVisibility, prompt.Visibility.ToValue()},
             {FieldNames.AIAssistant.ToLookupField(), prompt.Assistant?.Id},
             {FieldNames.AIFunctions.ToLookupField() + "@odata.type", "Collection(Edm.Int32)"},
@@ -121,6 +122,7 @@ public class PromptRepository : IPromptRepository
         var promptToUpdate = new Dictionary<string, object>()
         {
             {FieldNames.Title, prompt.Title},
+            {FieldNames.AICategory, prompt.Category},
             {FieldNames.AIPrompt, prompt.Content},
             {FieldNames.AIFunctions.ToLookupField() + "@odata.type", "Collection(Edm.Int32)"},
             {FieldNames.AIFunctions.ToLookupField(), prompt.Functions?.Select(a => a.Id)},

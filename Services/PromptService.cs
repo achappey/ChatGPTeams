@@ -12,6 +12,7 @@ public interface IPromptService
     Task<Prompt> GetPromptAsync(string id);
     Task<IEnumerable<Prompt>> GetMyPromptsAsync();
     Task<IEnumerable<Prompt>> GetPromptByContentAsync(string content);
+    Task<IEnumerable<string>> GetCategories();
     Task<string> CreatePromptAsync(Prompt prompt);
     Task UpdatePromptAsync(Prompt prompt);
     Task DeletePromptAsync(string id);
@@ -45,6 +46,15 @@ public class PromptService : IPromptService
         var user = await _userService.GetCurrentUser();
 
         return await EnrichPromptsAsync(await _promptRepository.GetPromptsByUser(user.Id, user.Department?.Id.ToInt()));
+    }
+
+    public async Task<IEnumerable<string>> GetCategories()
+    {
+        var user = await _userService.GetCurrentUser();
+
+        var items = await _promptRepository.GetPromptsByUser(user.Id, user.Department?.Id.ToInt());
+
+        return items.Select(a => a.Category).Distinct();
     }
 
     private async Task<IEnumerable<Prompt>> EnrichPromptsAsync(IEnumerable<Prompt> prompts)

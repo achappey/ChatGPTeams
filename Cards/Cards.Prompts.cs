@@ -70,22 +70,59 @@ namespace achappey.ChatGPTeams.Cards
                 Weight = AdaptiveTextWeight.Default
             });
 
-            // Regular expression to find words enclosed in single or double curly brackets
-            var matches = Regex.Matches(prompt, @"{{?(\w+)}?}");
+            // Regular expression to detect placeholders:
+            // - Words in curly brackets separated by pipes for dropdowns
+            // - Words enclosed in single or double curly brackets for text inputs
+            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}";
+            var matches = Regex.Matches(prompt, regexPattern);
+
+            // Use a HashSet to store unique placeholders
+            HashSet<string> addedPlaceholders = new HashSet<string>();
 
             foreach (Match match in matches.Cast<Match>())
             {
-                // Create an input field for each matching word
-                string inputLabel = match.Groups[1].Value;
-                bool isMultiLine = match.Value.StartsWith("{{") && match.Value.EndsWith("}}");
-
-                card.Body.Add(new AdaptiveTextInput
+                // Check if the placeholder is for a dropdown (curly brackets with pipes)
+                if (match.Groups[2].Success && match.Groups[3].Success)
                 {
-                    Id = inputLabel,
-                    Placeholder = inputLabel,
-                    IsRequired = true,
-                    IsMultiline = isMultiLine // Set to true if surrounded by double curly brackets
-                });
+                    string dropdownLabel = match.Groups[2].Value;
+                    string[] options = match.Groups[3].Value.Split('|');
+
+                    // Skip if already added
+                    if (addedPlaceholders.Contains(dropdownLabel))
+                        continue;
+
+                    addedPlaceholders.Add(dropdownLabel);
+
+                    card.Body.Add(new AdaptiveChoiceSetInput
+                    {
+                        Id = dropdownLabel,
+                        Placeholder = "Selecteer een " +  dropdownLabel,
+                        Choices = options.Select(o => new AdaptiveChoice { Title = o, Value = o }).ToList(),
+                        Style = AdaptiveChoiceInputStyle.Compact,
+                        IsRequired = true
+                    });
+                }
+                else
+                {
+                    // Create an input field for each unique matching word
+                    string inputLabel = match.Groups[1].Value;
+
+                    // Skip the placeholder if it has already been added
+                    if (addedPlaceholders.Contains(inputLabel))
+                        continue;
+
+                    addedPlaceholders.Add(inputLabel); // Remember the placeholder we added
+
+                    bool isMultiLine = match.Value.StartsWith("{{") && match.Value.EndsWith("}}");
+
+                    card.Body.Add(new AdaptiveTextInput
+                    {
+                        Id = inputLabel,
+                        Placeholder = inputLabel,
+                        IsRequired = true,
+                        IsMultiline = isMultiLine // Set to true if surrounded by double curly brackets
+                    });
+                }
             }
 
             card.Actions.Add(new AdaptiveSubmitAction
@@ -102,9 +139,12 @@ namespace achappey.ChatGPTeams.Cards
             };
         }
 
-        public static Attachment CreateEditPromptCard(Prompt selectedPrompt, IEnumerable<Assistant> assistants, IEnumerable<Function> functions)
+
+        public static Attachment CreateEditPromptCard(Prompt selectedPrompt, IEnumerable<Assistant> assistants,
+        IEnumerable<Function> functions, IEnumerable<string> categories)
         {
             var assistantChoices = assistants.Select(a => new AdaptiveChoice { Title = a.Name, Value = a.Id.ToString() }).ToList();
+            var categoryChoices = categories.Order().Select(f => new AdaptiveChoice { Title = f, Value = f }).ToList();
             var functionChoices = functions.OrderBy(a => a.Title).Select(f => new AdaptiveChoice { Title = f.Title, Value = f.Id.ToString() }).ToList();
             var visibilityChoices = Enum.GetValues(typeof(Visibility)).Cast<Visibility>().Select(a => new AdaptiveChoice { Title = a.ToText(), Value = a.ToText() }).ToList();
             var selectedFunctionValues = selectedPrompt.Functions.Select(f => f.Id.ToString()).ToList();
@@ -142,11 +182,20 @@ namespace achappey.ChatGPTeams.Cards
                     },
                     new AdaptiveChoiceSetInput
                     {
+                        Id = "Category",
+                        Choices = categoryChoices,
+                        Placeholder = CardsConfigText.SelectCategoryText,
+                        Label = CardsConfigText.Category,
+                        Style = AdaptiveChoiceInputStyle.Compact,
+                        Value = selectedPrompt.Category
+                    },
+                         new AdaptiveChoiceSetInput
+                    {
                         Id = "VisibilityChoice",
                         Choices = visibilityChoices,
                         IsRequired = true,
-                        Placeholder = CardsConfigText.SelectVisibilityText, // Update this text as needed
-                        Label = CardsConfigText.Visibility, // Update this text as needed
+                        Placeholder = CardsConfigText.SelectVisibilityText,
+                        Label = CardsConfigText.Visibility,
                         Style = AdaptiveChoiceInputStyle.Compact,
                         Value = selectedPrompt.Visibility.ToText()
                     },
@@ -222,6 +271,7 @@ namespace achappey.ChatGPTeams.Cards
                 {
                     new AdaptiveFact { Title = "Eigenaar", Value = selectedPrompt.Owner?.DisplayName },
                     new AdaptiveFact { Title = "Zichtbaarheid", Value = selectedPrompt.Visibility == Visibility.Department ? selectedPrompt.Department?.Name : selectedPrompt.Visibility == Visibility.Owner ? selectedPrompt.Owner.DisplayName : CardsConfigText.EveryoneText },
+                    new AdaptiveFact { Title = "Categorie", Value = selectedPrompt.Category },
                     new AdaptiveFact { Title = "AI-assistent", Value = selectedPrompt.Assistant?.Name },
                     new AdaptiveFact { Title = "Functies", Value = string.Join(", ", selectedPrompt.Functions?.Select(a => a.Title)) }
                 }

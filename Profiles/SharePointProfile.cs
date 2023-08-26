@@ -73,6 +73,7 @@ public class SharePointProfile : AutoMapper.Profile
         CreateMap<ListItem, Models.Prompt>()
                .ForMember(dest => dest.Content, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIPrompt)))
                .ForMember(dest => dest.Title, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.Title)))
+               .ForMember(dest => dest.Category, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AICategory)))
                .ForMember(dest => dest.Assistant, opt => opt.MapFrom(src => src.GetAssistant()))
                .ForMember(dest => dest.Visibility, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIVisibility).ToVisibility()))
                .ForMember(dest => dest.Functions, opt => opt.MapFrom(src => src.GetFieldValues(FieldNames.AIFunctions).Select(a => a.ToFunction())))

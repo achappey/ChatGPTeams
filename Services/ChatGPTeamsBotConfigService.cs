@@ -59,6 +59,7 @@ public interface IChatGPTeamsBotConfigService
     Task UpdatePromptAsync(ConversationReference reference,
                            string promptId,
                            string title,
+                           string category,
                            string content,
                            string assistant,
                            IEnumerable<Function> functions,
@@ -77,6 +78,7 @@ public interface IChatGPTeamsBotConfigService
                             int skip,
                             string replyToId,
                             string titleFilter,
+                            string categoryFilter,
                             string ownerFilter,
                             Visibility? visibilityFilter,
                             CancellationToken cancellationToken);
@@ -216,14 +218,14 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
     }
 
     public async Task SelectPromptsAsync(ConversationContext context, ConversationReference reference, int skip, string replyToId, string titleFilter,
-                            string ownerFilter, Visibility? visibilityFilter, CancellationToken cancellationToken)
+                           string categoryFilter, string ownerFilter, Visibility? visibilityFilter, CancellationToken cancellationToken)
     {
         var prompts = await _promptService.GetMyPromptsAsync();
         var conversation = await _conversationService.GetConversationByContextAsync(context);
         var messages = await _messageService.GetByConversationAsync(context, conversation.Id);
 
         await _proactiveMessageService.SelectPromptsAsync(reference, prompts, replyToId,
-        context.UserDisplayName, skip, titleFilter, ownerFilter, messages.Count(), visibilityFilter, cancellationToken);
+        context.UserDisplayName, skip, titleFilter, categoryFilter, ownerFilter, messages.Count(), visibilityFilter, cancellationToken);
     }
 
     public async Task SelectResourcesAsync(ConversationContext context, ConversationReference reference, string replyToId, CancellationToken cancellationToken)
@@ -315,7 +317,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
     {
         await _promptService.DeletePromptAsync(promptId);
 
-        await SelectPromptsAsync(context, reference, 0, context.ReplyToId, null, null, null, cancellationToken);
+        await SelectPromptsAsync(context, reference, 0, context.ReplyToId, null, null, null, null, cancellationToken);
     }
 
     public async Task DeleteResourceAsync(ConversationContext context,
@@ -363,7 +365,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         await _promptService.CreatePromptAsync(newPrompt);
     }
 
-    public async Task UpdatePromptAsync(ConversationReference reference, string promptId, string title,
+    public async Task UpdatePromptAsync(ConversationReference reference, string promptId, string title, string category,
     string content, string assistant, IEnumerable<Function> functions,
     Visibility visibilty, string replyToId, CancellationToken cancellationToken)
     {
@@ -371,6 +373,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         prompt.Title = title;
         prompt.Content = content;
         prompt.Visibility = visibilty;
+        prompt.Category = category;
         prompt.Functions = functions;
 
         if (prompt.Visibility == Visibility.Department)
@@ -397,9 +400,10 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
     {
         var assistants = await _assistantService.GetMyAssistants();
         var functions = await _functionService.GetAllFunctionsAsync();
+        var categories = await _promptService.GetCategories();
 
         await _proactiveMessageService.EditPromptAsync(reference, prompt, assistants,
-                functions, replyToId, cancellationToken);
+                functions, categories, replyToId, cancellationToken);
     }
 
     public async Task DeleteFunctionFromPromptAsync(ConversationReference reference, string promptId,

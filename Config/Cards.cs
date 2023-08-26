@@ -27,6 +27,7 @@ public static class CardsConfigText
     public const string AiAssistantText = "AI-assistent";
     public const string SelectAiAssistantText = "Selecteer een AI-assistent";
     public const string SelectVisibilityText = "Selecteer zichtbaarheid";
+    public const string SelectCategoryText = "Selecteer categorie";
     public const string CreativityLevelText = "Creativiteitsniveau";
     public const string VisibleForText = "Zichtbaar voor";
     public const string CreativityLevelExtendedText = "Creativiteitsniveau (hoe hoger, hoe creatiever)";
@@ -57,11 +58,16 @@ public static class CardsConfigText
     public const string Owner = "Eigenaar";
     public const string DepartmentText = "Onderneming";
     public const string Visibility = "Zichtbaarheid";
+    public const string Category = "Categorie";
 }
 
 public static class CardsConfigCommands
 {
     public const string NewTemperature = "NewTemperature";
+    public const string SearchPrompts = "SearchPrompts";
+    
+    public const string SelectPromptAction = "SelectPromptAction";
+    
     public const string AddFunctionToPrompt = "AddFunctionToPrompt";
     public const string RemoveFunctionToPrompt = "RemoveFunctionToPrompt";
     public const string NextPage = "NextPromptPage";

@@ -15,6 +15,7 @@ namespace achappey.ChatGPTeams.Cards
 
         public static Attachment CreatePromptInfoCard(IEnumerable<Prompt> prompts, string currentUser, int messageCount, int page = 0,
                 string titleFilter = null,
+                string categoryFilter = null,
                 string ownerFilter = null,
                 Visibility? visiblityFilter = null)
         {
@@ -23,11 +24,16 @@ namespace achappey.ChatGPTeams.Cards
             var visibilityOptions = Enum.GetValues(typeof(Visibility)).Cast<Visibility>().Select(a => new AdaptiveChoice { Title = a.ToText(), Value = a.ToText() }).ToList();
 
             // Counting active filters
-            int activeFilters = (titleFilter != null ? 1 : 0) + (ownerFilter != null ? 1 : 0) + (visiblityFilter != null ? 1 : 0);
+            int activeFilters = (titleFilter != null ? 1 : 0) + (ownerFilter != null ? 1 : 0) + (visiblityFilter != null ? 1 : 0) + (categoryFilter != null ? 1 : 0);
 
             if (!string.IsNullOrEmpty(titleFilter))
             {
                 prompts = prompts.Where(a => a.Title != null && a.Title.Contains(titleFilter, StringComparison.OrdinalIgnoreCase));
+            }
+
+              if (!string.IsNullOrEmpty(categoryFilter))
+            {
+                prompts = prompts.Where(a => a.Category != null && a.Category == categoryFilter);
             }
 
             if (visiblityFilter.HasValue)
@@ -74,9 +80,23 @@ namespace achappey.ChatGPTeams.Cards
                 }
             });
 
+                   // List of potential category names
+            List<string> categories = prompts.Select(t => t.Category).Distinct().ToList();
+
+            // Create the ChoiceSet with the selected categories
+
+  var categoryChoiceSet = new AdaptiveChoiceSetInput
+            {
+                Id = "CategorySelection",
+                Placeholder = "Selecteer een categorie",
+                Value = categoryFilter, // default value
+                Choices = categories.Select(category => new AdaptiveChoice { Title = category, Value = category }).ToList(),
+                Style = AdaptiveChoiceInputStyle.Compact
+            };
+
             card.Actions.Add(new AdaptiveShowCardAction
             {
-                Title = $"Filters ({activeFilters})",
+                Title = $"Meer filters ({activeFilters})",
                 Card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
                 {
                     Body =
@@ -99,7 +119,7 @@ namespace achappey.ChatGPTeams.Cards
                                     Id = "OwnerFilter",
                                     Value = ownerFilter,
                                     Placeholder = CardsConfigText.SelectOwner,
-                                        Choices = owners.Select(a => new AdaptiveChoice { Title = a, Value = a }).ToList(),
+                                    Choices = owners.Select(a => new AdaptiveChoice { Title = a, Value = a }).ToList(),
                                     Style = AdaptiveChoiceInputStyle.Compact
                                 },
                                 new AdaptiveChoiceSetInput
@@ -121,6 +141,10 @@ namespace achappey.ChatGPTeams.Cards
                             }
                 }
             });
+
+
+
+
 
             // Add "Previous Page" button if there is a previous page
             if (page > 0)
@@ -157,59 +181,87 @@ namespace achappey.ChatGPTeams.Cards
                 });
             }
 
+        
+
+
+     
+          
+
+            var selectCategoryAction = new AdaptiveSubmitAction
+            {
+                Title = "Filter categorie",
+                Id = "CategoryFilter",
+                Data = new { ActionType = CardsConfigCommands.ApplyPromptFilter } // Use this ActionType in your bot logic to know when a category has been selected
+            };
+          
+            // Create a ColumnSet to align the dropdown next to the submit button
+            var categoryColumnSet = new AdaptiveColumnSet
+            {
+                Columns = new List<AdaptiveColumn>
+    {
+        new AdaptiveColumn // For the dropdown
+        {
+            Items = { categoryChoiceSet },
+            Width = AdaptiveColumnWidth.Stretch
+        },
+        new AdaptiveColumn // For the submit button
+        {
+            Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { selectCategoryAction } } },
+            Width = AdaptiveColumnWidth.Auto
+        }
+    }
+            };
+
+            
+
+            card.Body.Add(  new AdaptiveTextBlock
+                    {
+                        Text = "Dialogen" + $" ({page + 1} van {totalPages})",
+                        Size = AdaptiveTextSize.Default,
+                        Weight = AdaptiveTextWeight.Bolder
+                    });
+
+
+
+
             foreach (var prompt in currentPrompts)
             {
                 var actions = new List<AdaptiveAction>
-                {
-                    new AdaptiveSubmitAction
-                    {
-                        Title = CardsConfigText.ExecuteText,
-                        Data = new { ActionType = CardsConfigCommands.ExecutePromptAction, ExecutePromptId = prompt.Id }
-                    }
-                };
+    {
+        new AdaptiveSubmitAction
+        {
+            Title = CardsConfigText.ExecuteText,
+            Data = new { ActionType = CardsConfigCommands.ExecutePromptAction, ExecutePromptId = prompt.Id }
+        }
+    };
 
                 if (prompt.Owner.DisplayName == currentUser)
                 {
-
-
                     var editAction = new AdaptiveSubmitAction
                     {
                         Title = "Wijzigen",
                         Data = new { ActionType = CardsConfigCommands.EditPromptAction, ResourceId = prompt.Id }
                     };
-                    actions.Add(editAction); // Added the editAction to the actions list
-
+                    actions.Add(editAction);
                 }
 
-                // Moved the creation of the editAction outside of the column set
-
-                card.Body.Add(new AdaptiveColumnSet
+                var titleAndContentColumn = new AdaptiveColumn
                 {
-                    Style = AdaptiveContainerStyle.Emphasis,
-                    Columns = new List<AdaptiveColumn>
-                    {
-                        new AdaptiveColumn
-                        {
-                            Items = {
-                                new AdaptiveTextBlock
-                                {
-                                    Text = $"{prompt.Title}",
-                                    Weight = AdaptiveTextWeight.Bolder,
-                                    Size = AdaptiveTextSize.Medium,
-                                    Wrap = true
-                                }
-                            },
-                            Width = AdaptiveColumnWidth.Stretch
-                        }
-                    }
-                });
-
-                card.Body.Add(new AdaptiveTextBlock
-                {
-                    Text = $"{prompt.Content}",
-                    Wrap = true,
-                    Size = AdaptiveTextSize.Small
-                });
+                    Width = AdaptiveColumnWidth.Stretch,
+                    Items = {
+            new AdaptiveTextBlock
+            {
+                Text = $"{prompt.Title}",
+                Weight = AdaptiveTextWeight.Bolder,
+                Size = AdaptiveTextSize.Medium,
+            },
+            new AdaptiveTextBlock
+            {
+                Text = $"{prompt.Content}",
+                Size = AdaptiveTextSize.Small
+            }
+        }
+                };
 
                 var actionsColumn = new AdaptiveColumn { Width = AdaptiveColumnWidth.Auto };
                 foreach (var action in actions)
@@ -223,36 +275,33 @@ namespace achappey.ChatGPTeams.Cards
                 card.Body.Add(new AdaptiveColumnSet
                 {
                     Columns = new List<AdaptiveColumn>
-                    {
-                        new AdaptiveColumn
-                        {
-                            Items = {
-                                new AdaptiveFactSet
-                                {
-                                    Separator = true,
-                                    Spacing = AdaptiveSpacing.Padding,
-                                    Facts = new List<AdaptiveFact>
-                                    {
-                                        new AdaptiveFact { Title = "Eigenaar", Value = prompt.Owner?.DisplayName },
-                                        new AdaptiveFact { Title = "Zichtbaarheid", Value = visibilityText },
-                                        new AdaptiveFact { Title = "AI-assistent", Value = prompt.Assistant?.Name },
-                                        new AdaptiveFact { Title = "Functies", Value = string.Join(", ", prompt.Functions?.Select(a => a.Title)) }
-                                    }
-                                }
-                            },
-                            Width = AdaptiveColumnWidth.Stretch
-                        },
-                        actionsColumn
-                    }
+        {
+            titleAndContentColumn,   // This column contains the title and content
+            actionsColumn            // This column contains the action buttons
+        },
+                    Separator = true,               // This adds the separator
+                    Spacing = AdaptiveSpacing.Default // Optional, adjust for desired spacing
                 });
+
+
+
             }
 
+                card.Body.Add(  new AdaptiveTextBlock
+                    {
+                        Text = "Filters",
+                        Size = AdaptiveTextSize.Default,
+                        Weight = AdaptiveTextWeight.Bolder
+                    });
+
+            card.Body.Add(categoryColumnSet);
             return new Attachment()
             {
                 ContentType = AdaptiveCard.ContentType,
                 Content = card
             };
+
         }
+
     }
 }
-

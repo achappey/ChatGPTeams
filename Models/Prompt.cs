@@ -13,6 +13,8 @@ namespace achappey.ChatGPTeams.Models
         
         public string? Title { get; set; }
 
+        public string? Category { get; set; }
+
         public User Owner { get; set; } = null!;
 
         public Department? Department { get; set; }

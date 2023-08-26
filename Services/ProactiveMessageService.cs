@@ -30,6 +30,7 @@ public interface IProactiveMessageService
         string currentUser,
         int page,
         string titleFilter,
+        string categoryFilter,
         string ownerFilter,
         int messageCount,
         Visibility? visibilityFilter,
@@ -84,7 +85,7 @@ public interface IProactiveMessageService
        CancellationToken cancellationToken);
 
     Task EditPromptAsync(ConversationReference conversationReference, Prompt prompt, IEnumerable<Assistant> assistants,
-            IEnumerable<Function> functions, string replyToId, CancellationToken cancellationToken);
+            IEnumerable<Function> functions,  IEnumerable<string> categories, string replyToId, CancellationToken cancellationToken);
     Task ShowMenuAsync(ConversationReference conversationReference,
         string appName,
         string assistantName,
@@ -351,6 +352,7 @@ public class ProactiveMessageService : IProactiveMessageService
         string currentUser,
         int page,
         string titleFilter,
+        string categoryFilter,
         string ownerFilter,
         int messageCount,
         Visibility? visibilityFilter,
@@ -358,7 +360,7 @@ public class ProactiveMessageService : IProactiveMessageService
     {
         return _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
         {
-            var card = MessageFactory.Attachment(ChatCards.CreatePromptInfoCard(prompts, currentUser, messageCount, page, titleFilter, ownerFilter, visibilityFilter));
+            var card = MessageFactory.Attachment(ChatCards.CreatePromptInfoCard(prompts, currentUser, messageCount, page, titleFilter, categoryFilter, ownerFilter, visibilityFilter));
             if (!string.IsNullOrEmpty(replyToId))
             {
                 card.Id = replyToId;
@@ -373,11 +375,11 @@ public class ProactiveMessageService : IProactiveMessageService
     }
 
     public Task EditPromptAsync(ConversationReference conversationReference, Prompt prompt, IEnumerable<Assistant> assistants,
-            IEnumerable<Function> functions, string replyToId, CancellationToken cancellationToken)
+            IEnumerable<Function> functions, IEnumerable<string> categories, string replyToId, CancellationToken cancellationToken)
     {
         return _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
         {
-            var card = MessageFactory.Attachment(ChatCards.CreateEditPromptCard(prompt, assistants, functions));
+            var card = MessageFactory.Attachment(ChatCards.CreateEditPromptCard(prompt, assistants, functions, categories));
 
             if (!string.IsNullOrEmpty(replyToId))
             {

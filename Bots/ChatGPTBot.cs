@@ -125,6 +125,7 @@ namespace achappey.ChatGPTeams
 
                     string titleFilter = null;
                     string ownerFilter = null;
+                    string categoryFilter = null;
                     Visibility? visiblityFilter = null;
                     if (data.ContainsKey("TitleFilter"))
                     {
@@ -141,6 +142,11 @@ namespace achappey.ChatGPTeams
                         ownerFilter = data["OwnerFilter"].Value<string>();
                     }
 
+                    if (data.ContainsKey("CategorySelection"))
+                    {
+                        categoryFilter = data["CategorySelection"].Value<string>();
+                    }
+
                     switch (actionType)
                     {
                         case CardsConfigCommands.ExecutePromptAction:
@@ -155,6 +161,13 @@ namespace achappey.ChatGPTeams
                             var sourcePrompt = data["SourcePrompt"].Value<string>();
                             var promptId = data["PromptId"].Value<string>();
 
+
+                            // Regular expression to detect placeholders:
+                            // - Words in curly brackets separated by pipes for dropdowns
+                            // - Words enclosed in single or double curly brackets for text inputs
+                            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}";
+                            var matches = Regex.Matches(sourcePrompt, regexPattern);
+
                             foreach (var property in data.Properties())
                             {
                                 if (property.Name != "SourcePrompt" && property.Name != "ActionType" && property.Name != "PromptId")
@@ -162,24 +175,21 @@ namespace achappey.ChatGPTeams
                                     string placeholder = property.Name;
                                     string value = property.Value.Value<string>();
 
-                                    // Replace placeholders with double curly brackets
-                                    sourcePrompt = sourcePrompt.Replace($"{{{{{placeholder}}}}}", value);
+                                    // Replace placeholders with the selected value
+                                    foreach (Match match in matches)
+                                    {
+                                        if (match.Groups[1].Success && match.Groups[1].Value == placeholder) // Single or double curly brackets
+                                        {
+                                            sourcePrompt = sourcePrompt.Replace(match.Value, value);
+                                        }
+                                        else if (match.Groups[2].Success && match.Groups[2].Value == placeholder) // Dropdown format
+                                        {
+                                            sourcePrompt = sourcePrompt.Replace(match.Value, value);
+                                        }
+                                    }
                                 }
                             }
-
-                            // Repeat loop for single curly brackets
-                            foreach (var property in data.Properties())
-                            {
-                                if (property.Name != "SourcePrompt" && property.Name != "ActionType" && property.Name != "PromptId")
-                                {
-                                    string placeholder = property.Name;
-                                    string value = property.Value.Value<string>();
-
-                                    // Replace placeholders with single curly brackets
-                                    sourcePrompt = sourcePrompt.Replace($"{{{placeholder}}}", value);
-                                }
-                            }
-
+                   
                             var message = _mapper.Map<Message>(turnContext.Activity);
 
                             message.Content = sourcePrompt;
@@ -200,12 +210,14 @@ namespace achappey.ChatGPTeams
                             var newTitle = data["PromptTitle"].Value<string>();
                             var newPromptAssistant = data.ContainsKey("AssistantChoice") ? data["AssistantChoice"].Value<string>() : null;
                             var visiblity = data["VisibilityChoice"].Value<string>().TextToVisibility();
+                            var category = data.ContainsKey("Category") ? data["Category"].Value<string>() : null;
                             var functionChoices = data.ContainsKey("FunctionChoices") ? data["FunctionChoices"].Value<string>().ToFunctions() : null;
 
 
                             await _chatGPTeamsBotConfigService.UpdatePromptAsync(turnContext.Activity.GetConversationReference(),
                                                                                  promptSaveId,
                                                                                  newTitle,
+                                                                                 category,
                                                                                  newContent,
                                                                                  newPromptAssistant,
                                                                                  functionChoices,
@@ -276,7 +288,8 @@ namespace achappey.ChatGPTeams
 
                             await _chatGPTeamsBotConfigService.ClearHistoryAsync(await turnContext.ToConversationContext());
 
-                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(context, turnContext.Activity.GetConversationReference(), 0, context.ReplyToId, titleFilter, ownerFilter, visiblityFilter, cancellationToken);
+                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(context, turnContext.Activity.GetConversationReference(), 0,
+                             context.ReplyToId, titleFilter, categoryFilter, ownerFilter, visiblityFilter, cancellationToken);
                             break;
                         case CardsConfigCommands.SelectFunctionsCommand:
                             await _chatGPTeamsBotConfigService.SelectFunctionsAsync(await turnContext.ToConversationContext(),
@@ -310,7 +323,7 @@ namespace achappey.ChatGPTeams
                             await _chatGPTeamsBotConfigService.SelectPromptsAsync(await turnContext.ToConversationContext(),
                                                                             turnContext.Activity.GetConversationReference(),
                                                                             0,
-                                                                            null,
+                                                                            null, null,
                                                                             null, null, null,
                                                                             cancellationToken);
 
@@ -329,7 +342,7 @@ namespace achappey.ChatGPTeams
                                                                            turnContext.Activity.GetConversationReference(),
                                                                            nextPage,
                                                                            context.ReplyToId,
-                                                                            titleFilter, ownerFilter, visiblityFilter,
+                                                                            titleFilter, categoryFilter, ownerFilter, visiblityFilter,
                                                                            cancellationToken);
 
                             break;
@@ -339,7 +352,7 @@ namespace achappey.ChatGPTeams
                                                                            turnContext.Activity.GetConversationReference(),
                                                                            prevPage,
                                                                            context.ReplyToId,
-                                                                           titleFilter, ownerFilter, visiblityFilter,
+                                                                           titleFilter, categoryFilter, ownerFilter, visiblityFilter,
                                                                            cancellationToken);
 
                             break;
@@ -348,7 +361,7 @@ namespace achappey.ChatGPTeams
                                                                            turnContext.Activity.GetConversationReference(),
                                                                            0,
                                                                            context.ReplyToId,
-                                                                           titleFilter, ownerFilter, visiblityFilter,
+                                                                           titleFilter, categoryFilter, ownerFilter, visiblityFilter,
                                                                            cancellationToken);
 
                             break;
