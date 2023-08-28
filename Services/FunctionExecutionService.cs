@@ -32,12 +32,13 @@ public class FunctionExecutionService : IFunctionExecutionService
     private readonly IMapper _mapper;
     private readonly IVaultService _vaultService;
     private readonly IFunctionDefinitonRepository _functionDefinitonRepository;
+    private readonly IImageRepository _imageRepository;
 
     private readonly IGraphClientFactory _graphClientFactory;
 
     public FunctionExecutionService(AppConfig appConfig, IGraphClientFactory graphClientFactory, IVaultService vaultService, IAssistantRepository assistantRepository,
     IFunctionService functionService, IFunctionDefinitonRepository functionDefinitonRepository, IResourceService resourceService, IConversationRepository conversationRepository,
-    IHttpClientFactory httpClientFactory, IRequestService requestService, IAssistantService assistantService)
+    IHttpClientFactory httpClientFactory, IRequestService requestService, IAssistantService assistantService, IImageRepository imageRepository)
     {
         _appConfig = appConfig;
         _httpClientFactory = httpClientFactory;
@@ -46,6 +47,7 @@ public class FunctionExecutionService : IFunctionExecutionService
         _vaultService = vaultService;
         _functionService = functionService;
         _assistantRepository = assistantRepository;
+        _imageRepository = imageRepository;
         _resourceService = resourceService;
         _conversationRepository = conversationRepository;
         _assistantService = assistantService;
@@ -178,6 +180,11 @@ public class FunctionExecutionService : IFunctionExecutionService
             {
                 var url = Arg("url");
                 return JsonConvert.SerializeObject(await _resourceService.ImportResourceAsync(reference, new Resource() { Url = url, Name = url, Id = null }));
+            },
+            ["CreateImages"] = async () =>
+            {
+                var prompt = Arg("prompt");
+                return JsonConvert.SerializeObject(await _imageRepository.CreateImages(prompt));
             },
             ["GetFunctionDefinitions"] = async () => JsonConvert.SerializeObject(await _functionDefinitonRepository.GetAll())
         };

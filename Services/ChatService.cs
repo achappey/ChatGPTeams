@@ -19,7 +19,6 @@ public class ChatService : IChatService
 {
     private readonly IChatRepository _chatRepository;
     private readonly IEmbeddingRepository _embeddingRepository;
-    private readonly IMembersRepository _membersRepository;
     private readonly IMessageService _messageService;
     private readonly IConversationRepository _conversationRepository;
     private readonly IAssistantRepository _assistantRepository;
@@ -29,14 +28,13 @@ public class ChatService : IChatService
 
     public ChatService(IChatRepository chatRepository, IEmbeddingRepository embeddingRepository, IMemoryCache cache,
     IAssistantRepository assistantRepository,
-    IMembersRepository membersRepository, IMessageService messageService, IConversationRepository conversationRepository,
+    IMessageService messageService, IConversationRepository conversationRepository,
     IFunctionDefinitonRepository functionDefinitonRepository, IResourceRepository resourceService)
     {
         _chatRepository = chatRepository;
         _embeddingRepository = embeddingRepository;
         _messageService = messageService;
         _resourceRepository = resourceService;
-        _membersRepository = membersRepository;
         _conversationRepository = conversationRepository;
         _functionDefinitonRepository = functionDefinitonRepository;
         _assistantRepository = assistantRepository;
@@ -48,7 +46,7 @@ public class ChatService : IChatService
     {
         var conversation = await _conversationRepository.GetByTitle(context.Id);
         conversation.Assistant = await _assistantRepository.Get(conversation.Assistant.Id);
-        conversation.Assistant.Prompt += $"{DateTime.Now.ToLocalTime()}";
+        conversation.Assistant.Prompt += $"Current date/time:{DateTime.Now.ToLocalTime()}";
         conversation.Assistant.Resources = await _resourceRepository.GetByAssistant(conversation.Assistant.Id);
         conversation.FunctionDefinitions = await _functionDefinitonRepository.GetByNames(conversation.AllFunctionNames);
         conversation.Messages = (await _messageService.GetByConversationAsync(context, conversation.Id)).ToList();

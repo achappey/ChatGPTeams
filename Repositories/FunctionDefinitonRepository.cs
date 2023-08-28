@@ -225,6 +225,19 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
                     Required = new List<string>() { "url" }
                 }
             },
+            new FunctionDefinition() {
+                Name = "CreateImages",
+                Description = "Creates images with DALL-E AI image generation",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"prompt", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The image prompt",
+                        }}
+                    },
+                    Required = new List<string>() { "prompt" }
+                }
+            },
               new FunctionDefinition() {
                 Name = "GetChatResources",
                 Description = "Gets all resources attached to this chat",

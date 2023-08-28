@@ -12,11 +12,6 @@ public class TokenService : ITokenService
 
     public string GetToken()
     {
-        if (_token == null)
-        {
-        //    throw new Exception("Token not set");
-        }
-        
         return _token;
     }
 

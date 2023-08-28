@@ -27,7 +27,6 @@ public class ResourceService : IResourceService
     private readonly IResourceRepository _resourceRepository;
     private readonly IEmbeddingRepository _embeddingRepository;
     private readonly IConversationRepository _conversationRepository;
-    private readonly IAssistantRepository _assistantRepository;
     private readonly IMemoryCache _cache;
 
     public ResourceService(IResourceRepository resourceRepository, IConversationRepository conversationRepository,

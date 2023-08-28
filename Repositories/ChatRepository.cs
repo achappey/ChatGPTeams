@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
 using SharpToken;
+using System.Web;
 
 namespace achappey.ChatGPTeams.Repositories;
 
@@ -103,10 +104,11 @@ public class ChatRepository : IChatRepository
                 .Sum(encoded => encoded.Count());
 
         int remainingTokensAfterChat = maxTokenSize - chatHistoryTokens;
-        int reservedTokensForEmbeddings = (remainingTokensAfterChat > maxTokenSize / 2) ? remainingTokensAfterChat : maxTokenSize / 2;
+        //int maxChatTokenSize = (maxTokenSize / 3) * 2;
+        int reservedTokensForEmbeddings = (remainingTokensAfterChat > maxTokenSize / 3) ? remainingTokensAfterChat : maxTokenSize / 3;
 
         // If chat history exceeds its 50% quota, trim it
-        while (chatHistoryTokens > maxTokenSize / 2 && chat.Messages.Count > 0)
+        while (chatHistoryTokens > maxTokenSize / 3 && chat.Messages.Count > 0)
         {
             var oldestMessage = chat.Messages.First();
             chatHistoryTokens -= encoding.Encode(oldestMessage.Content).Count();
@@ -146,20 +148,19 @@ public class ChatRepository : IChatRepository
         return selectedEmbeddings;
     }
 
-
-
     private string CreateContextQuery(IEnumerable<EmbeddingScore> topResults)
     {
         return string.Join(" ", topResults
             .GroupBy(r => r.Url)
             .Select(g => new
             {
+                //Url = HttpUtility.UrlEncode(g.Key),
                 Url = g.Key,
                 BestScore = g.Max(r => r.Score),
-                Texts = string.Join(" ", g.Select(r => r.Text))
+                Texts = string.Join(",", g.Select(r => r.Text.Trim()))
             })
             .OrderByDescending(g => g.BestScore)
-            .Select(g => g.Url + " " + g.Texts));
+            .Select(g => $"Attachments: [{g.Url}]:{g.Texts}"));
     }
 
 

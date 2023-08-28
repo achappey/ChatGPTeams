@@ -68,6 +68,7 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IMembersRepository, CompositeMembersRepository>();
             services.AddScoped<IEmbeddingRepository, EmbeddingRepository>();
             services.AddScoped<IResourceRepository, ResourceRepository>();
+            services.AddScoped<IImageRepository, ImageRepository>();
             services.AddScoped<IConversationRepository, ConversationRepository>();
             services.AddScoped<IFunctionRepository, FunctionRepository>();
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();

@@ -36,13 +36,11 @@ public interface IChatGPTeamsBotChatService
 
 public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
 {
-    private readonly IAssistantService _assistantService;
     private readonly IConversationService _conversationService;
     private readonly IResourceService _resourceService;
     private readonly IFunctionService _functionService;
     private readonly IPromptService _promptService;
     private readonly IMessageService _messageService;
-    private readonly IUserService _userService;
     private readonly IChatService _chatService;
     private readonly IFunctionExecutionService _functionExecutionService;
 
@@ -50,9 +48,7 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
     private readonly IMapper _mapper;
 
 
-    public ChatGPTeamsBotChatService(IAssistantService assistantService,
-                                 IConversationService conversationService,
-                                 IUserService userService,
+    public ChatGPTeamsBotChatService(IConversationService conversationService,
                                  IMapper mapper,
                                  IMessageService messageService,
                                  IPromptService promptService,
@@ -62,7 +58,6 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
                                  IResourceService resourceService,
                                  IFunctionExecutionService functionExecutionService)
     {
-        _assistantService = assistantService;
         _conversationService = conversationService;
         _functionService = functionService;
         _functionExecutionService = functionExecutionService;
@@ -70,7 +65,6 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         _messageService = messageService;
         _chatService = chatService;
         _resourceService = resourceService;
-        _userService = userService;
         _mapper = mapper;
         _proactiveMessageService = proactiveMessageService;
     }
@@ -186,10 +180,10 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         foreach (var item in items)
         {
 
-            var cardId = await _proactiveMessageService.ImportResourceAsync(reference, item, cancellationToken); // Import the resource
-            var lineCount = await _resourceService.ImportResourceAsync(reference, item); // Get the line count of the resource
+            var cardId = await _proactiveMessageService.ImportResourceAsync(reference, item, cancellationToken);
+            var lineCount = await _resourceService.ImportResourceAsync(reference, item); 
 
-            await _proactiveMessageService.ImportResourceFinishedAsync(reference, item, lineCount, cardId, cancellationToken); // Signal the completion of the import
+            await _proactiveMessageService.ImportResourceFinishedAsync(reference, item, lineCount, cardId, cancellationToken); 
         }
     }
 
