@@ -75,6 +75,7 @@ public interface IProactiveMessageService
 
     Task ExecuteCustomPromptAsync(ConversationReference conversationReference,
       string sourcePrompt,
+      string title,
       string replyToId,
       string user,
       CancellationToken cancellationToken);
@@ -232,13 +233,14 @@ public class ProactiveMessageService : IProactiveMessageService
 
     public Task ExecuteCustomPromptAsync(ConversationReference conversationReference,
        string sourcePrompt,
+       string title,
        string replyToId,
        string user,
        CancellationToken cancellationToken)
     {
         return _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
                {
-                   var promptExecuteCard = MessageFactory.Attachment(ChatCards.CreateExecutePromptCard(sourcePrompt, user));
+                   var promptExecuteCard = MessageFactory.Attachment(ChatCards.CreateExecutePromptCard(sourcePrompt, title, user));
                    promptExecuteCard.Id = replyToId;
 
                    await turnContext.UpdateActivityAsync(promptExecuteCard, cancellationToken);

@@ -12,7 +12,7 @@ namespace achappey.ChatGPTeams.Services.Graph
     {
         [MethodDescription("Gets events for the user using the Microsoft Graph API")]
         public async Task<IEnumerable<Models.Graph.Event>> SearchEvents(
-            [ParameterDescription("User e-mail of the calendar")] string userMail = null,
+            [ParameterDescription("User id of the calendar")] string userId,
             [ParameterDescription("Subject of the event to search for")] string subject = null,
             [ParameterDescription("Organizer of the event to search for")] string organizer = null,
             [ParameterDescription("Start date in ISO 8601 format.")] string fromDate = null,
@@ -45,16 +45,14 @@ namespace achappey.ChatGPTeams.Services.Graph
             var filterQuery = string.Join(" and ", filterQueries);
             var selectQuery = "id,webLink,bodyPreview,subject,start,end";
 
-            var client = string.IsNullOrEmpty(userMail) ? graphClient.Me : graphClient.Users[userMail];
-
-            var events = await client.Events
+            var events = await graphClient.Users[userId].Events
                 .Request()
                 .Filter(filterQuery)
                 .Select(selectQuery)
                 .GetAsync();
 
             return events
-                .Take(10)
+                .Take(20)
                 .Select(a => _mapper.Map<Models.Graph.Event>(a));
         }
 

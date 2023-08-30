@@ -9,6 +9,7 @@ using achappey.ChatGPTeams.Config;
 using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Services;
+using AdaptiveCards;
 using AutoMapper;
 using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Dialogs;
@@ -67,7 +68,31 @@ namespace achappey.ChatGPTeams
 
 
         }
+        string ReplaceMatchedFields(string prompt, MatchCollection matches, string placeholder, string value)
+        {
+            foreach (Match match in matches)
+            {
+                // Debug info
+                Console.WriteLine($"Match Value: {match.Value}, Placeholder: {placeholder}");
 
+                if (match.Groups[1].Success && match.Groups[1].Value == placeholder)
+                {
+                    string beforeReplace = prompt;
+                    prompt = prompt.Replace(match.Value, value);
+
+                    // Debug info
+                    if (beforeReplace != prompt)
+                    {
+                        Console.WriteLine("Vervanging geslaagd!");
+                    }
+                    else
+                    {
+                        Console.WriteLine("Geen vervanging.");
+                    }
+                }
+            }
+            return prompt;
+        }
 
         protected override async Task OnMessageActivityAsync(ITurnContext<IMessageActivity> turnContext,
                                                              CancellationToken cancellationToken)
@@ -153,7 +178,7 @@ namespace achappey.ChatGPTeams
                             var executePromptId = data["ExecutePromptId"].Value<string>();
                             var executePrompt = await _chatGPTeamsBotConfigService.GetPrompt(executePromptId);
 
-                            var formCard = ChatCards.CreatePromptFormCard(executePrompt.Id, executePrompt.Content);
+                            var formCard = ChatCards.CreatePromptFormCard(executePrompt.Id, executePrompt.Title, executePrompt.Content);
                             await turnContext.SendActivityAsync(MessageFactory.Attachment(formCard), cancellationToken: cancellationToken);
                             break;
 
@@ -161,13 +186,10 @@ namespace achappey.ChatGPTeams
                             var sourcePrompt = data["SourcePrompt"].Value<string>();
                             var promptId = data["PromptId"].Value<string>();
 
+                            var generalPattern = @"\{(\w+)(?:\(type=(\w+),?(?:multi=(true|false))?,?(?:required=(true|false))?,?(?:min=(\d+))?,?(?:max=(\d+))?,?(?:options=([^\)]+))?\))?\}";
 
-                            // Regular expression to detect placeholders:
-                            // - Words in curly brackets separated by pipes for dropdowns
-                            // - Words enclosed in single or double curly brackets for text inputs
-                            // - {fieldname|date} for date picker input
-                            var regexPattern = @"{{?(\w+)}?}|\{(\w+)\|([\w\|]+)\}|\{(\w+)\&date\}";
-                            var matches = Regex.Matches(sourcePrompt, regexPattern);
+                            var generalPattern2 = Regex.Matches(sourcePrompt, generalPattern);
+                            var generalPattern2Matches = Regex.Matches(sourcePrompt, generalPattern);
 
                             foreach (var property in data.Properties())
                             {
@@ -175,26 +197,12 @@ namespace achappey.ChatGPTeams
                                 {
                                     string placeholder = property.Name;
                                     string value = property.Value.Value<string>();
+                                    // Vervang alle velden op basis van generalPattern2
+                                    sourcePrompt = ReplaceMatchedFields(sourcePrompt, generalPattern2Matches, placeholder, value);
 
-                                    // Replace placeholders with the selected value
-                                    foreach (Match match in matches)
-                                    {
-                                        if (match.Groups[1].Success && match.Groups[1].Value == placeholder) // Single or double curly brackets
-                                        {
-                                            sourcePrompt = sourcePrompt.Replace(match.Value, value);
-                                        }
-                                        else if (match.Groups[2].Success && match.Groups[2].Value == placeholder) // Dropdown format
-                                        {
-                                            sourcePrompt = sourcePrompt.Replace(match.Value, value);
-                                        }
-                                        else if (match.Groups[4].Success && match.Groups[4].Value == placeholder) // Date picker format
-                                        {
-                                            sourcePrompt = sourcePrompt.Replace(match.Value, value);
-                                        }
-                                    }
+
                                 }
                             }
-
 
                             var message = _mapper.Map<Message>(turnContext.Activity);
 
@@ -218,7 +226,6 @@ namespace achappey.ChatGPTeams
                             var visiblity = data["VisibilityChoice"].Value<string>().TextToVisibility();
                             var category = data.ContainsKey("Category") ? data["Category"].Value<string>() : null;
                             var functionChoices = data.ContainsKey("FunctionChoices") ? data["FunctionChoices"].Value<string>().ToFunctions() : null;
-
 
                             await _chatGPTeamsBotConfigService.UpdatePromptAsync(turnContext.Activity.GetConversationReference(),
                                                                                  promptSaveId,
@@ -491,18 +498,21 @@ namespace achappey.ChatGPTeams
 
         }
 
-        protected override async Task<MessagingExtensionResponse> OnTeamsMessagingExtensionSelectItemAsync(ITurnContext<IInvokeActivity> turnContext, JObject query, CancellationToken cancellationToken)
+        protected override async Task<MessagingExtensionResponse> OnTeamsMessagingExtensionSelectItemAsync(ITurnContext<IInvokeActivity> turnContext,
+                JObject query, CancellationToken cancellationToken)
         {
             await EnsureToken(turnContext, cancellationToken);
 
+
             var selectedPrompt = query.ToObject<Prompt>();
 
-            var formCard = ChatCards.CreatePromptFormCard(selectedPrompt.Id, selectedPrompt.Content);
+            var formCard = ChatCards.CreatePromptFormCard(selectedPrompt.Id, selectedPrompt.Title, selectedPrompt.Content);
             await turnContext.SendActivityAsync(MessageFactory.Attachment(formCard), cancellationToken: cancellationToken);
 
             return new MessagingExtensionResponse
             {
             };
+
         }
 
         protected async Task EnsureToken(ITurnContext turnContext, CancellationToken cancellationToken)
@@ -536,16 +546,36 @@ namespace achappey.ChatGPTeams
                     break;
 
                 case "webView":
+                    var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0));
+                    card.Body.Add(new AdaptiveTextBlock() { Text = "Hello" });
+                    // Voeg hier meer elementen toe aan je kaart op basis van je behoeften
+
+                    var messagingExtensionAttachment = new MessagingExtensionAttachment
+                    {
+                        Content = card,
+                        ContentType = AdaptiveCard.ContentType
+                    };
+
                     return await Task.FromResult(new MessagingExtensionActionResponse()
                     {
                         ComposeExtension = new MessagingExtensionResult
                         {
-
-                            Type = "message",
-                            Text = "Hello"
+                            Type = "result",
+                            AttachmentLayout = "list",
+                            Attachments = new List<MessagingExtensionAttachment>() { messagingExtensionAttachment }
                         }
-
                     });
+
+                    /*     return await Task.FromResult(new MessagingExtensionActionResponse()
+                         {
+                             ComposeExtension = new MessagingExtensionResult
+                             {
+
+                                 Type = "message",
+                                 Text = "Hello"
+                             }
+
+                         });*/
             }
 
             return await Task.FromResult(new MessagingExtensionActionResponse());

@@ -11,7 +11,7 @@ namespace achappey.ChatGPTeams.Services;
 
 public interface IChatGPTeamsBotChatService
 {
- 
+
     Task ProcessMessageAsync(ConversationContext context,
                              Message message,
                              CancellationToken cancellationToken);
@@ -181,9 +181,9 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         {
 
             var cardId = await _proactiveMessageService.ImportResourceAsync(reference, item, cancellationToken);
-            var lineCount = await _resourceService.ImportResourceAsync(reference, item); 
+            var lineCount = await _resourceService.ImportResourceAsync(reference, item);
 
-            await _proactiveMessageService.ImportResourceFinishedAsync(reference, item, lineCount, cardId, cancellationToken); 
+            await _proactiveMessageService.ImportResourceFinishedAsync(reference, item, lineCount, cardId, cancellationToken);
         }
     }
 
@@ -220,9 +220,9 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
     public async Task ExecuteCustomPrompt(ConversationContext context, ConversationReference reference, string promptId, Message message, string user, string replyToId,
           CancellationToken cancellationToken)
     {
-        await _proactiveMessageService.ExecuteCustomPromptAsync(reference, message.Content, replyToId, user, cancellationToken);
-
         var prompt = await _promptService.GetPromptAsync(promptId);
+        await _proactiveMessageService.ExecuteCustomPromptAsync(reference, message.Content, prompt.Title, replyToId, user, cancellationToken);
+
 
         var currentConversation = await _conversationService.GetConversationByContextAsync(context);
 

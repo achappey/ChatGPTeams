@@ -71,6 +71,8 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IImageRepository, ImageRepository>();
             services.AddScoped<IConversationRepository, ConversationRepository>();
             services.AddScoped<IFunctionRepository, FunctionRepository>();
+            services.AddScoped<IFilesRepository, FilesRepository>();
+            services.AddScoped<IFineTuningRepository, FineTuningRepository>();
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();
             services.AddScoped<IPromptRepository, PromptRepository>();
             services.AddScoped<IRequestRepository, RequestRepository>();

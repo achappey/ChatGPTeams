@@ -31,7 +31,7 @@ namespace achappey.ChatGPTeams.Cards
                 prompts = prompts.Where(a => a.Title != null && a.Title.Contains(titleFilter, StringComparison.OrdinalIgnoreCase));
             }
 
-              if (!string.IsNullOrEmpty(categoryFilter))
+            if (!string.IsNullOrEmpty(categoryFilter))
             {
                 prompts = prompts.Where(a => a.Category != null && a.Category == categoryFilter);
             }
@@ -80,12 +80,12 @@ namespace achappey.ChatGPTeams.Cards
                 }
             });
 
-                   // List of potential category names
+            // List of potential category names
             List<string> categories = prompts.Select(t => t.Category).Distinct().ToList();
 
             // Create the ChoiceSet with the selected categories
 
-  var categoryChoiceSet = new AdaptiveChoiceSetInput
+            var categoryChoiceSet = new AdaptiveChoiceSetInput
             {
                 Id = "CategorySelection",
                 Placeholder = "Selecteer een categorie",
@@ -106,14 +106,14 @@ namespace achappey.ChatGPTeams.Cards
                                     Text = "Filter opties:",
                                     Weight = AdaptiveTextWeight.Bolder
                                 },
-                                new AdaptiveChoiceSetInput
+              /*                  new AdaptiveChoiceSetInput
                                 {
                                     Id = "TitleFilter",
                                     Placeholder = CardsConfigText.SelectName,
                                     Value = titleFilter,
                                     Choices = titles.Select(a => new AdaptiveChoice { Title = a, Value = a }).ToList(),
                                     Style = AdaptiveChoiceInputStyle.Compact
-                                },
+                                },*/
                                 new AdaptiveChoiceSetInput
                                 {
                                     Id = "OwnerFilter",
@@ -181,45 +181,255 @@ namespace achappey.ChatGPTeams.Cards
                 });
             }
 
-        
-
-
-     
-          
-
-            var selectCategoryAction = new AdaptiveSubmitAction
+            // Eerste Rij - Categorie
+            // Eerste Rij - Tekstinvoer
+            var textInputAction1 = new AdaptiveSubmitAction
             {
-                Title = "Filter categorie",
-                Id = "CategoryFilter",
-                Data = new { ActionType = CardsConfigCommands.ApplyPromptFilter } // Use this ActionType in your bot logic to know when a category has been selected
+                Title = "Zoeken",
+                Id = "TitleFilterButton",
+                Data = new { ActionType = CardsConfigCommands.ApplyPromptFilter }
             };
-          
-            // Create a ColumnSet to align the dropdown next to the submit button
-            var categoryColumnSet = new AdaptiveColumnSet
+
+            var textInput = new AdaptiveTextInput
+            {
+                Id = "TitleFilter",
+                Value = titleFilter,
+                Placeholder = "Zoek in de naam of dialoog",
+            };
+
+            var firstRow = new AdaptiveColumnSet
             {
                 Columns = new List<AdaptiveColumn>
     {
-        new AdaptiveColumn // For the dropdown
+        new AdaptiveColumn // Voor de tekstinvoer
         {
-            Items = { categoryChoiceSet },
+            Items = { textInput },
             Width = AdaptiveColumnWidth.Stretch
         },
-        new AdaptiveColumn // For the submit button
+        new AdaptiveColumn // Voor de eerste knop
         {
-            Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { selectCategoryAction } } },
+            Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { textInputAction1 } } },
             Width = AdaptiveColumnWidth.Auto
         }
     }
             };
 
-            
+            // Tweede Rij - Een andere categorie
+            var selectCategoryAction2 = new AdaptiveSubmitAction
+            {
+                Title = "Filter categorie",
+                Id = "CategorySelection",
+                
+                Data = new { ActionType = CardsConfigCommands.ApplyPromptFilter }
+            };
 
-            card.Body.Add(  new AdaptiveTextBlock
+            var secondRow = new AdaptiveColumnSet
+            {
+                Columns = new List<AdaptiveColumn>
+    {
+        new AdaptiveColumn // Voor de tweede dropdown
+        {
+            Items = { categoryChoiceSet  },
+            Width = AdaptiveColumnWidth.Stretch
+        },
+        new AdaptiveColumn // Voor de tweede knop
+        {
+            Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { selectCategoryAction2 } } },
+            Width = AdaptiveColumnWidth.Auto
+        }
+    }
+            };
+
+            // Samenvoegen
+            var allRows = new List<AdaptiveElement> { firstRow, secondRow };
+
+
+
+            /*
+            // Eerste rij: Categorie Invoer en Knop
+            var categoryAction = new AdaptiveSubmitAction
+            {
+                Title = "Filter categorie",
+                Id = "CategoryAction",
+                Data = new { ActionType = "FilterCategory" }
+            };
+
+            // Tweede rij: Zoek Invoer en Knop
+            var searchAction = new AdaptiveSubmitAction
+            {
+                Title = "Zoeken",
+                Id = "SearchAction",
+                Data = new { ActionType = "SearchAction" }
+            };
+
+            var updatedCategoryColumnSet = new AdaptiveColumnSet
+            {
+                Columns = new List<AdaptiveColumn>
+                {
+                    // Eerste rij
+                    new AdaptiveColumn
                     {
-                        Text = "Dialogen" + $" ({page + 1} van {totalPages})",
-                        Size = AdaptiveTextSize.Default,
-                        Weight = AdaptiveTextWeight.Bolder
-                    });
+                        Items = {
+                            new AdaptiveTextInput { Id = "CategoryInput", Placeholder = "Categorie..." },
+                            new AdaptiveActionSet { Actions = new List<AdaptiveAction> { categoryAction } }
+                        },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    // Tweede rij
+                    new AdaptiveColumn
+                    {
+                        Items = {
+                            new AdaptiveTextInput { Id = "SearchInput", Placeholder = "Zoek..." },
+                            new AdaptiveActionSet { Actions = new List<AdaptiveAction> { searchAction } }
+                        },
+                        Width = AdaptiveColumnWidth.Stretch
+                    }
+                }
+            };
+            // Eerste rij
+            var firstRow = new AdaptiveColumnSet
+            {
+                Columns = new List<AdaptiveColumn>
+                {
+                    new AdaptiveColumn // Voor het eerste dropdown
+                    {
+                        Items = { categoryChoiceSet },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    new AdaptiveColumn // Voor de eerste knop
+                    {
+                        Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { selectCategoryAction } } },
+                        Width = AdaptiveColumnWidth.Auto
+                    }
+                }
+            };
+
+            // Tweede rij
+            var secondRow = new AdaptiveColumnSet
+            {
+                Columns = new List<AdaptiveColumn>
+                {
+                    new AdaptiveColumn // Voor het tweede dropdown
+                    {
+                        Items = { anotherCategoryChoiceSet },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    new AdaptiveColumn // Voor de tweede knop
+                    {
+                        Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { anotherSelectCategoryAction } } },
+                        Width = AdaptiveColumnWidth.Auto
+                    }
+                }
+            };
+
+            // Voeg rijen toe aan kaartlichaam
+            card.Body.Add(firstRow);
+            card.Body.Add(secondRow);
+            */
+
+            /*
+
+                        var searchInput = new AdaptiveTextInput
+                        {
+                            Id = "SearchFilter",
+                            Placeholder = "Zoek...",
+                            Value = "" // Standaardwaarde
+                        };
+
+                        var searchAction = new AdaptiveSubmitAction
+                        {
+                            Title = "Zoeken",
+                            Id = "SearchAction",
+                            Data = new { ActionType = "SearchAction" } // Gebruik deze ActionType om te weten wanneer er gezocht wordt
+                        };
+
+
+
+                        var selectCategoryAction = new AdaptiveSubmitAction
+                        {
+                            Title = "Filter categorie",
+                            Id = "CategoryFilter",
+                            Data = new { ActionType = CardsConfigCommands.ApplyPromptFilter } // Use this ActionType in your bot logic to know when a category has been selected
+                        };
+
+
+            var updatedCategoryColumnSet = new AdaptiveColumnSet
+            {
+                Columns = new List<AdaptiveColumn>
+                {
+                    // Eerste rij
+                    new AdaptiveColumn
+                    {
+                        Items = {
+                            new AdaptiveTextInput { Id = "CategoryInput", Placeholder = "Categorie..." },
+                            new AdaptiveActionSet { Actions = new List<AdaptiveAction> { categoryAction } }
+                        },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    // Tweede rij
+                    new AdaptiveColumn
+                    {
+                        Items = {
+                            new AdaptiveTextInput { Id = "SearchInput", Placeholder = "Zoek..." },
+                            new AdaptiveActionSet { Actions = new List<AdaptiveAction> { searchAction } }
+                        },
+                        Width = AdaptiveColumnWidth.Stretch
+                    }
+                }
+            };
+                        // Update de bestaande categoryColumnSet
+                        var updatedCategoryColumnSet = new AdaptiveColumnSet
+                        {
+                            Columns = new List<AdaptiveColumn>
+                {
+                    new AdaptiveColumn // Voor de dropdown
+                    {
+                        Items = { categoryChoiceSet },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    new AdaptiveColumn // Voor de zoekfunctie
+                    {
+                        Items = { searchInput },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    new AdaptiveColumn // Voor de knoppen
+                    {
+                        Items = {
+                            new AdaptiveActionSet { Actions = new List<AdaptiveAction> { selectCategoryAction, searchAction } }
+                        },
+                        Width = AdaptiveColumnWidth.Auto
+                    }
+                }
+                        };
+
+
+
+                        // Create a ColumnSet to align the dropdown next to the submit button
+                        var categoryColumnSet = new AdaptiveColumnSet
+                        {
+                            Columns = new List<AdaptiveColumn>
+                {
+                    new AdaptiveColumn // For the dropdown
+                    {
+                        Items = { categoryChoiceSet },
+                        Width = AdaptiveColumnWidth.Stretch
+                    },
+                    new AdaptiveColumn // For the submit button
+                    {
+                        Items = { new AdaptiveActionSet { Actions = new List<AdaptiveAction> { selectCategoryAction } } },
+                        Width = AdaptiveColumnWidth.Auto
+                    }
+                }
+                        };
+            */
+
+
+            card.Body.Add(new AdaptiveTextBlock
+            {
+                Text = "Dialogen" + $" ({page + 1} van {totalPages})",
+                Size = AdaptiveTextSize.Default,
+                Weight = AdaptiveTextWeight.Bolder
+            });
 
 
 
@@ -287,14 +497,15 @@ namespace achappey.ChatGPTeams.Cards
 
             }
 
-                card.Body.Add(  new AdaptiveTextBlock
-                    {
-                        Text = "Filters",
-                        Size = AdaptiveTextSize.Default,
-                        Weight = AdaptiveTextWeight.Bolder
-                    });
+            card.Body.Add(new AdaptiveTextBlock
+            {
+                Text = "Filters",
+                Size = AdaptiveTextSize.Default,
+                Weight = AdaptiveTextWeight.Bolder
+            });
 
-            card.Body.Add(categoryColumnSet);
+            //card.Body.Add(updatedCategoryColumnSet);
+            card.Body.AddRange(allRows);
             return new Attachment()
             {
                 ContentType = AdaptiveCard.ContentType,

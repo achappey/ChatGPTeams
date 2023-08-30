@@ -60,7 +60,8 @@ public class PromptRepository : IPromptRepository
 
         var items = await GraphService.GetListItemsFromListAsync(_siteId, ListNames.AIPrompts, filter, _selectQuery);
 
-        return items.Select(a => _mapper.Map<Prompt>(a)).Where(a => a.Content.ToLowerInvariant().Contains(content.ToLowerInvariant()));
+        return items.Select(a => _mapper.Map<Prompt>(a)).Where(a => a.Title.ToLowerInvariant().Contains(content.ToLowerInvariant())
+                || a.Content.ToLowerInvariant().Contains(content.ToLowerInvariant()));
     }
 
     private string BuildPromptFilter(int userId, int? departmentId)

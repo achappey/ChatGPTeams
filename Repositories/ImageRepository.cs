@@ -1,4 +1,3 @@
-using System;
 using AutoMapper;
 using System.Collections.Generic;
 using System.Linq;
@@ -7,7 +6,6 @@ using achappey.ChatGPTeams.Models;
 using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
-using SharpToken;
 using OpenAI.ObjectModels;
 using System.Threading.Tasks;
 
@@ -30,23 +28,6 @@ public class ImageRepository : IImageRepository
         _logger = logger;
         _mapper = mapper;
         _openAIService = openAIService;
-    }
-
-    private ChatCompletionCreateRequest ToChatCompletionCreateRequest(Conversation conversation)
-    {
-        var messages = new List<ChatMessage>() {
-            conversation.Assistant.ToChatMessage()
-        };
-
-        messages.AddRange(conversation.Messages.Select(a => _mapper.Map<ChatMessage>(a)));
-
-        return new ChatCompletionCreateRequest
-        {
-            Model = conversation.Assistant.Model,
-            Temperature = conversation.Temperature,
-            Messages = messages,
-            Functions = conversation.FunctionDefinitions?.Count() > 0 ? conversation.FunctionDefinitions?.ToList() : null,
-        };
     }
 
     public async Task<IEnumerable<string>> CreateImages(string prompt)
