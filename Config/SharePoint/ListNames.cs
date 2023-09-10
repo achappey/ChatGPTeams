@@ -7,6 +7,8 @@ public static class ListNames
     public const string AIDepartments = "Departments";
     public const string AIFunctions = "Functions";
     public const string AIPrompts = "Prompts";
+    public const string AITeams = "Teams";
+    public const string AIChannels = "Channels";
     public const string AIResources = "Resources";
     public const string AIMessages = "Messages";
     public const string AIVaults = "Vaults";

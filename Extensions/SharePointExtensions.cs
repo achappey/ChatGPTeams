@@ -27,7 +27,17 @@ namespace achappey.ChatGPTeams.Extensions
             return new Function()
             {
                 Id = value.LookupId.ToString(),
-                Name = value.LookupValue
+                //Name = value.LookupValue
+            };
+        }
+        
+        public static Database.Models.Function ToDbFunction(this LookupField value)
+        {
+            return new Database.Models.Function()
+            {
+                Id = value.LookupValue,
+
+                //Name = value.LookupValue
             };
         }
 
@@ -40,7 +50,7 @@ namespace achappey.ChatGPTeams.Extensions
             };
         }
 
-     public static User GetOwner(this Microsoft.Graph.ListItem src)
+        public static User GetOwner(this Microsoft.Graph.ListItem src)
         {
             if (!src.Fields.AdditionalData.ContainsKey(FieldNames.AIOwner.ToLookupField()))
             {
@@ -50,7 +60,7 @@ namespace achappey.ChatGPTeams.Extensions
             return new User()
             {
                 DisplayName = src.GetFieldValue(FieldNames.AIOwner),
-                Id = src.GetFieldValue(FieldNames.AIOwner.ToLookupField()).ToInt().Value,
+                Id = src.GetFieldValue(FieldNames.AIOwner.ToLookupField()),
             };
         }
 
@@ -58,7 +68,7 @@ namespace achappey.ChatGPTeams.Extensions
         {
             return !string.IsNullOrEmpty(value) ? new User()
             {
-                Id = value.ToInt().Value
+                Id = value
             } : null;
         }
 
@@ -100,7 +110,7 @@ namespace achappey.ChatGPTeams.Extensions
             return src.Fields.AdditionalData.ContainsKey(FieldNames.Title) ? src.GetFieldValue(FieldNames.Title) : null;
         }
 
-    public static Department GetDepartment(this Microsoft.Graph.ListItem src)
+        public static Department GetDepartment(this Microsoft.Graph.ListItem src)
         {
             if (!src.Fields.AdditionalData.ContainsKey(FieldNames.AIDepartment.ToLookupField()))
             {
@@ -124,7 +134,7 @@ namespace achappey.ChatGPTeams.Extensions
             return new Assistant()
             {
                 Name = src.GetFieldValue(FieldNames.AIAssistant),
-                Id = src.GetFieldValue(FieldNames.AIAssistant.ToLookupField()),
+                Id = src.GetFieldValue(FieldNames.AIAssistant.ToLookupField()).ToInt().Value,
             };
         }
 

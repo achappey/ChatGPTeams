@@ -49,7 +49,7 @@ namespace achappey.ChatGPTeams.Cards
                 foreach (var categoryGroup in functionsGroupedByCategory)
                 {
                     // Create choices for current group
-                    var functionChoices = categoryGroup.Select(f => new AdaptiveChoice { Title = f.Title, Value = f.Name }).ToList();
+                    var functionChoices = categoryGroup.Select(f => new AdaptiveChoice { Title = f.Title, Value = f.Id }).ToList();
 
                     // Add a new dropdown for each group
                     publisherCard.Body.Add(new AdaptiveChoiceSetInput()
@@ -138,7 +138,7 @@ namespace achappey.ChatGPTeams.Cards
                                     new AdaptiveSubmitAction
                                     {
                                         Title = CardsConfigText.RemoveText,
-                                        Data = new { ActionType = CardsConfigCommands.DeleteFunctionAction, FunctionName = function.Name }
+                                        Data = new { ActionType = CardsConfigCommands.DeleteFunctionAction, FunctionName = function.Id }
                                     }
                                 }
                             }

@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Attributes;
+using achappey.ChatGPTeams.Extensions;
+using Microsoft.Graph;
 
 namespace achappey.ChatGPTeams.Services.Graph
 {
@@ -10,13 +12,13 @@ namespace achappey.ChatGPTeams.Services.Graph
     // See: https://developer.microsoft.com/en-us/graph
     public partial class GraphFunctionsClient
     {
-        [MethodDescription("Gets events for the user using the Microsoft Graph API")]
-        public async Task<IEnumerable<Models.Graph.Event>> SearchEvents(
-            [ParameterDescription("User id of the calendar")] string userId,
-            [ParameterDescription("Subject of the event to search for")] string subject = null,
-            [ParameterDescription("Organizer of the event to search for")] string organizer = null,
-            [ParameterDescription("Start date in ISO 8601 format.")] string fromDate = null,
-            [ParameterDescription("End date in ISO 8601 format")] string toDate = null)
+        [MethodDescription("Calendar|Gets events for the specified user.")]
+        public async Task<string> SearchEvents(
+                [ParameterDescription("User id of the calendar")] string userId,
+                [ParameterDescription("Subject of the event to search for")] string subject = null,
+                [ParameterDescription("Organizer of the event to search for")] string organizer = null,
+                [ParameterDescription("Date in ISO 8601 format")] string date = null,
+                [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
 
@@ -32,28 +34,29 @@ namespace achappey.ChatGPTeams.Services.Graph
                 filterQueries.Add($"organizer/emailAddress/address eq '{organizer}'");
             }
 
-            if (!string.IsNullOrEmpty(fromDate) && DateTime.TryParse(fromDate, out DateTime parsedFromDate))
+            if (!string.IsNullOrEmpty(date) && DateTime.TryParse(date, out DateTime parsedFromDate))
             {
+                DateTime parsedToDate = parsedFromDate.AddDays(1);
                 filterQueries.Add($"start/dateTime ge '{parsedFromDate:s}Z'");
+                filterQueries.Add($"end/dateTime lt '{parsedToDate:s}Z'");
             }
 
-            if (!string.IsNullOrEmpty(toDate) && DateTime.TryParse(toDate, out DateTime parsedToDate))
+            var filterOptions = new List<QueryOption>();
+            if (!string.IsNullOrEmpty(skipToken))
             {
-                filterQueries.Add($"end/dateTime le '{parsedToDate:s}Z'");
+                filterOptions.Add(new QueryOption("$skiptoken", skipToken));
             }
 
             var filterQuery = string.Join(" and ", filterQueries);
-            var selectQuery = "id,webLink,bodyPreview,subject,start,end";
+            var selectQuery = "id,subject,start,end";
 
             var events = await graphClient.Users[userId].Events
-                .Request()
+                .Request(filterOptions)
                 .Filter(filterQuery)
                 .Select(selectQuery)
                 .GetAsync();
 
-            return events
-                .Take(20)
-                .Select(a => _mapper.Map<Models.Graph.Event>(a));
+            return events.CurrentPage.Select(_mapper.Map<Models.Graph.Event>).ToHtmlTable(events.NextPageRequest?.QueryOptions.FirstOrDefault(a => a.Name == "$skiptoken")?.Value);
         }
 
 

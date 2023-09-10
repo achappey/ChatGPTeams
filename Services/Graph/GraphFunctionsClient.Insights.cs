@@ -2,7 +2,9 @@
 using System.Linq;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Attributes;
+using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Models.Graph;
+using Microsoft.Graph;
 
 namespace achappey.ChatGPTeams.Services.Graph
 {
@@ -11,26 +13,27 @@ namespace achappey.ChatGPTeams.Services.Graph
     public partial class GraphFunctionsClient
     {
 
-        [MethodDescription("Gets trending documents for the current user.")]
-        public async Task<IEnumerable<Trending>> GetMyTrendingDocuments(
+        [MethodDescription("Me|Gets trending documents for the current user.")]
+        public async Task<string> GetMyTrendingDocuments(
             [ParameterDescription("The type of the resource.")] ResourceType? resourceType = null)
         {
             var graphClient = GetAuthenticatedClient();
 
-            var trendingRequest = graphClient.Me.Insights.Trending.Request().Top(10);
-
+            var filterOptions = new List<QueryOption>();
             if (resourceType.HasValue)
             {
-                trendingRequest = trendingRequest.Filter($"ResourceVisualization/Type eq '{resourceType.Value}'");
+                filterOptions.Add(new QueryOption("$filter", $"ResourceVisualization/Type eq '{resourceType.Value}'"));
             }
 
-            var insights = await trendingRequest.GetAsync();
+            var insights = await graphClient.Me.Insights.Trending
+                                .Request(filterOptions)
+                                .GetAsync();
 
-            return insights.Select(_mapper.Map<Trending>);
+            return insights.CurrentPage.Select(_mapper.Map<Models.Graph.Trending>).ToHtmlTable(null);
         }
 
-        [MethodDescription("Gets used documents for the current user.")]
-        public async Task<IEnumerable<UsedInsight>> GetMyUsedDocuments(
+        [MethodDescription("Me|Gets used documents for the current user.")]
+        public async Task<string> GetMyUsedDocuments(
             [ParameterDescription("The type of the resource.")] ResourceType? resourceType = null)
         {
             var graphClient = GetAuthenticatedClient();
@@ -44,11 +47,11 @@ namespace achappey.ChatGPTeams.Services.Graph
 
             var insights = await trendingRequest.GetAsync();
 
-            return insights.Select(_mapper.Map<UsedInsight>);
+              return insights.CurrentPage.Select(_mapper.Map<Models.Graph.UsedInsight>).ToHtmlTable(null);
         }
 
-        [MethodDescription("Gets documents shared with the current user.")]
-        public async Task<IEnumerable<SharedInsight>> GetDocumentsSharedWithMe(
+        [MethodDescription("Me|Gets documents shared with the current user.")]
+        public async Task<string> GetDocumentsSharedWithMe(
             [ParameterDescription("The type of the resource.")] ResourceType? resourceType = null)
         {
             var graphClient = GetAuthenticatedClient();
@@ -62,10 +65,8 @@ namespace achappey.ChatGPTeams.Services.Graph
 
             var sharedItems = await sharedRequest.GetAsync();
 
-            return sharedItems.Select(_mapper.Map<SharedInsight>);
+            return sharedItems.CurrentPage.Select(_mapper.Map<Models.Graph.SharedInsight>).ToHtmlTable(null);
         }
-
-
 
     }
 }

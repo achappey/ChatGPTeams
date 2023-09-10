@@ -8,6 +8,7 @@ using achappey.ChatGPTeams.Config.SharePoint;
 using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Services.Graph;
+using achappey.ChatGPTeams.Services.Simplicate;
 using AutoMapper;
 using Microsoft.Extensions.Caching.Memory;
 using Microsoft.Extensions.Logging;
@@ -17,15 +18,16 @@ namespace achappey.ChatGPTeams.Repositories;
 
 public interface IFunctionDefinitonRepository
 {
-    Task<Department> Get(string id);
-    Task<Department> GetByName(string name);
-    Task<IEnumerable<FunctionDefinition>> GetAll();
-    Task<IEnumerable<FunctionDefinition>> GetByNames(IEnumerable<string> names);
+    // Task<Department> Get(string id);
+    // Task<Department> GetByName(string name);
+    Task<IEnumerable<Function>> GetAll();
+    Task<IEnumerable<Function>> GetByNames(IEnumerable<string> names);
 }
 
 public class FunctionDefinitonRepository : IFunctionDefinitonRepository
 {
     private readonly string _siteId;
+    private readonly string _appName;
     private readonly ILogger<FunctionDefinitonRepository> _logger;
     private readonly IMapper _mapper;
     private readonly IGraphClientFactory _graphClientFactory;
@@ -37,6 +39,7 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
     {
         _siteId = config.SharePointSiteId;
         _logger = logger;
+        _appName = config.ConnectionName;
         _mapper = mapper;
         _cache = cache;
         _graphClientFactory = graphClientFactory;
@@ -50,41 +53,71 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
         }
     }
 
-    public async Task<IEnumerable<FunctionDefinition>> GetByNames(IEnumerable<string> names)
+    public async Task<IEnumerable<Function>> GetByNames(IEnumerable<string> names)
     {
         var items = await GetAll();
 
-        return items.Where(y => names.Any(i => i == y.Name));
+        return items.Where(y => names.Any(i => i == y.Id));
     }
 
-    public async Task<IEnumerable<FunctionDefinition>> GetAll()
+    private IEnumerable<Function> MapFunctionDefinitions(IEnumerable<FunctionDefinition> functionDefinitions, string publisherId)
     {
-        return await _cache.GetOrCreateAsync("FunctionDefinitions", async entry =>
+        return functionDefinitions.Select(f =>
+        {
+            string category = string.Empty;
+
+            // Check if there's a pipe in the description
+            if (f.Description.Contains("|"))
+            {
+                var parts = f.Description.Split('|');
+                category = parts[0].Trim();  // Text before the pipe
+                f.Description = parts[1].Trim();  // Text after the pipe, altering f.Description
+            }
+
+            return new Function
+            {
+                FunctionDefinition = f,
+                Id = f.Name,
+                Category = category,  // Set the Category
+                Publisher = publisherId
+            };
+        }).ToList();
+    }
+
+
+
+    private IEnumerable<Function> MapFunctionDefinitions2(IEnumerable<FunctionDefinition> functionDefinitions, string publisherId)
+    {
+        return functionDefinitions.Select(f => new Function
+        {
+            FunctionDefinition = f,
+            Id = f.Name,
+            // Category = [needthis]
+            Publisher = publisherId
+        });
+    }
+
+    public async Task<IEnumerable<Function>> GetAll()
+    {
+        return await _cache.GetOrCreateAsync("Functions", async entry =>
      {
          entry.AbsoluteExpirationRelativeToNow = TimeSpan.FromHours(1); // set cache expiration
 
-         var graph = GetGraphFunctionDefinitions().ToList();
-         graph.AddRange(await GetCustomFunctionDefinitions());
-         graph.AddRange(GetBuiltinFunctionDefinitions());
-         graph.AddRange(GetBuiltinVaultFunctionDefinitions());
+         var graphFuncs = MapFunctionDefinitions(GetGraphFunctionDefinitions(), "Microsoft");
+         var simplicateFuncs = MapFunctionDefinitions(GetSimplicateFunctionDefinitions(), "Simplicate");
+         var customFuncs = MapFunctionDefinitions(await GetCustomFunctionDefinitions(), "Custom");
+         var builtinFuncs = MapFunctionDefinitions(GetBuiltinFunctionDefinitions(), _appName);
+         var builtinVaultFuncs = MapFunctionDefinitions(GetBuiltinVaultFunctionDefinitions(), "Microsoft");
 
-         return graph;
+         // Combine all mapped Function objects into a single list
+         return graphFuncs.Concat(simplicateFuncs)
+                          .Concat(customFuncs)
+                          .Concat(builtinFuncs)
+                          .Concat(builtinVaultFuncs)
+                          .ToList();
      });
     }
 
-    public async Task<Department> GetByName(string name)
-    {
-        var item = await GraphService.GetFirstListItemFromListAsync(_siteId, ListNames.AIDepartments, $"fields/{FieldNames.Title} eq '{name}'");
-
-        return _mapper.Map<Department>(item);
-    }
-
-    public async Task<Department> Get(string id)
-    {
-        var item = await GraphService.GetListItemFromListAsync(_siteId, ListNames.AIDepartments, id);
-
-        return _mapper.Map<Department>(item);
-    }
 
     private IEnumerable<FunctionDefinition> GetBuiltinVaultFunctionDefinitions()
     {
@@ -205,14 +238,46 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
                     Properties = new Dictionary<string, FunctionParameterPropertyValue>()
                 }
             },
-              new FunctionDefinition() {
-                Name = "GetFunctions",
-                Description = "Search all functions",
+             new FunctionDefinition() {
+                Name = "GetDialogCategories",
+                Description = "Gets all dialog categories",
                 Parameters = new FunctionParameters() {
                     Properties = new Dictionary<string, FunctionParameterPropertyValue>()
                 }
             },
-               new FunctionDefinition() {
+            new FunctionDefinition() {
+                Name = "GetFunctions",
+                Description = "Search all functions",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"publisher", new FunctionParameterPropertyValue() {
+                            Type = "string",
+                            Description = "Publisher of the API function",
+                        }},
+                         {"category", new FunctionParameterPropertyValue() {
+                            Type = "string",
+                            Description = "Category of the function",
+                        }}
+                    }
+                }
+            },
+            new FunctionDefinition() {
+                Name = "GetDialogs",
+                Description = "Search all dialogs",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"category", new FunctionParameterPropertyValue() {
+                            Type = "string",
+                            Description = "Category of the dialog, exact match",
+                        }},
+                        {"content", new FunctionParameterPropertyValue() {
+                            Type = "string",
+                            Description = "Content of the dialog, searches in title and prompt",
+                        }}
+                    }
+                }
+            },
+            new FunctionDefinition() {
                 Name = "AddResourceToChat",
                 Description = "Adds a document to this chat",
                 Parameters = new FunctionParameters() {
@@ -223,6 +288,58 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
                         }}
                     },
                     Required = new List<string>() { "url" }
+                }
+            },
+            new FunctionDefinition() {
+                Name = "UpdateTeamsAssistant",
+                Description = "Updates the default AI-assistant for current Teams team.",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"assistantName", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The exact name of the assistant",
+                        }}
+                    },
+                    Required = new List<string>() { "assistantName" }
+                }
+            },
+            new FunctionDefinition() {
+                Name = "UpdateChannelAssistant",
+                Description = "Updates the default AI-assistant for current Teams channel.",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"assistantName", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The exact name of the assistant",
+                        }}
+                    },
+                    Required = new List<string>() { "assistantName" }
+                }
+            },
+            new FunctionDefinition() {
+                Name = "AddFunctionToChat",
+                Description = "Adds a ChatGPT API function to this chat",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"functionName", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "Name of the function",
+                        }}
+                    },
+                    Required = new List<string>() { "functionName" }
+                }
+            },
+             new FunctionDefinition() {
+                Name = "RemoveFunctionFromChat",
+                Description = "Removes a ChatGPT API function from this chat",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"functionName", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "Name of the function",
+                        }}
+                    },
+                    Required = new List<string>() { "functionName" }
                 }
             },
             new FunctionDefinition() {
@@ -238,16 +355,54 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
                     Required = new List<string>() { "prompt" }
                 }
             },
-              new FunctionDefinition() {
+            new FunctionDefinition() {
+                Name = "SaveDialog",
+                Description = "Save a dialog in the dialog book",
+                Parameters = new FunctionParameters() {
+                    Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"name", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The name of the dialog",
+                        }},
+                         {"prompt", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The AI chat prompt of the dialog",
+                        }},
+                        {"category", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The category of the dialog",
+                        }},
+                         {"assistantName", new FunctionParameterPropertyValue() {
+                            Type = "string",
+                            Description = "The name of the assistant",
+                        }}
+                    },
+                    Required = new List<string>() { "name", "prompt" }
+                }
+            },
+             new FunctionDefinition() {
                 Name = "GetChatResources",
                 Description = "Gets all resources attached to this chat",
                 Parameters = new FunctionParameters() {
                     Properties = new Dictionary<string, FunctionParameterPropertyValue>()
                 }
             },
-                 new FunctionDefinition() {
+                new FunctionDefinition() {
                 Name = "GetFunctionDefinitions",
-                Description = "Search all function definitions",
+                Description = "Gets function definition by function name",
+                Parameters = new FunctionParameters() {
+                  Properties = new Dictionary<string, FunctionParameterPropertyValue>() {
+                        {"functionName", new FunctionParameterPropertyValue() {
+                             Type = "string",
+                            Description = "The name of the function",
+                        }}
+                    },
+                    Required = new List<string>() { "functionName" }
+                }
+            },
+            new FunctionDefinition() {
+                Name = "GetFunctionCategories",
+                Description = "Gets all function categories",
                 Parameters = new FunctionParameters() {
                     Properties = new Dictionary<string, FunctionParameterPropertyValue>()
                 }
@@ -266,7 +421,9 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
     {
         var result = new List<FunctionDefinition>();
         var contentTypesCollectionPage = await GraphService.Sites[_siteId].ContentTypes.Request().Expand("columns").GetAsync();
-        var customFunctions = await GraphService.GetListItemsFromListAsync(_siteId, ListNames.AIFunctions, $"fields/{FieldNames.AIUrl} ne null");
+        // var customFunctions = await GraphService.GetListItemsFromListAsync(_siteId, ListNames.AIFunctions, $"fields/{FieldNames.AIUrl} ne null");
+        var allFunctions = await GraphService.GetAllListItemFromListAsync(_siteId, ListNames.AIFunctions);
+        var customFunctions = allFunctions.Where(a => a.GetFieldValue(FieldNames.AIUrl) != null);
         var items = contentTypesCollectionPage.ToList();
 
         if (methodNames != null)
@@ -308,20 +465,26 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
         return result;
     }
 
-    /// <summary>
-    /// Retrieves function definitions from the GraphFunctionsClient type.
-    /// Allows filtering of methods by provided names and constructs a set of
-    /// FunctionDefinition objects, including information like name, description,
-    /// and parameters.
-    /// </summary>
-    /// <param name="methodNames">Optional list of method names to filter the results (if null, all methods are included).</param>
-    /// <returns>An enumerable of FunctionDefinition objects representing the desired methods.</returns>
     private IEnumerable<FunctionDefinition> GetGraphFunctionDefinitions(IEnumerable<string> methodNames = null)
+    {
+        return GetTypedFunctionDefinitions<GraphFunctionsClient>(methodNames);
+
+    }
+
+    private IEnumerable<FunctionDefinition> GetSimplicateFunctionDefinitions(IEnumerable<string> methodNames = null)
+    {
+        return GetTypedFunctionDefinitions<SimplicateFunctionsClient>(methodNames);
+    }
+
+    private IEnumerable<FunctionDefinition> GetTypedFunctionDefinitions<T>(IEnumerable<string> methodNames = null)
     {
         var result = new List<FunctionDefinition>();
 
         // Get all instance, public, declared-only methods from GraphFunctionsClient
-        var methods = typeof(GraphFunctionsClient).GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance);
+        var methods = typeof(T).GetMethods(BindingFlags.DeclaredOnly | BindingFlags.Public | BindingFlags.Instance);
+
+        // New Filtering
+        methods = methods.Where(m => m.GetCustomAttribute<MethodDescriptionAttribute>() != null).ToArray();
 
         // If method names are provided, filter the methods by these names
         if (methodNames != null)
@@ -334,7 +497,7 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
         {
             var functionParameters = new FunctionParameters
             {
-                Properties = method.GetParameters().ToDictionary(param => param.Name, param => MapClrTypeToJsonSchemaType(param.ParameterType)),
+                Properties = method.GetParameters().ToDictionary(param => param.Name, param => MapClrTypeToJsonSchemaType(param.ParameterType, param)),
                 Required = method.GetParameters().Where(param => !param.IsOptional).Select(param => param.Name).ToList()
             };
 
@@ -349,29 +512,30 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
         return result;
     }
 
-
-
     /// <summary>
     /// Maps CLR types to JSON schema types.
     /// </summary>
-    private static FunctionParameterPropertyValue MapClrTypeToJsonSchemaType(Type type)
+    private static FunctionParameterPropertyValue MapClrTypeToJsonSchemaType(Type type, ParameterInfo paramInfo)
     {
-        if (type.IsEnum)
+        //  Console.WriteLine("Debug Type: " + type.FullName);
+        Type actualType = Nullable.GetUnderlyingType(type) ?? type;
+        if (actualType.IsEnum)
         {
             return new FunctionParameterPropertyValue
             {
                 Type = "string",
-                Description = type.GetCustomAttribute<ParameterDescriptionAttribute>()?.Description ?? string.Empty,
-                Enum = Enum.GetNames(type)
+                Description = actualType.GetCustomAttribute<ParameterDescriptionAttribute>()?.Description ?? string.Empty,
+                Enum = Enum.GetNames(actualType)
             };
         }
 
-        if (TypeMap.TryGetValue(type, out var jsonSchemaType))
+        if (TypeMap.TryGetValue(actualType, out var jsonSchemaType))
         {
             return new FunctionParameterPropertyValue
             {
                 Type = jsonSchemaType,
-                Description = type.GetCustomAttribute<ParameterDescriptionAttribute>()?.Description ?? string.Empty
+                Description = paramInfo.GetCustomAttribute<ParameterDescriptionAttribute>()?.Description ?? string.Empty
+                //Description = actualType.GetCustomAttribute<ParameterDescriptionAttribute>()?.Description ?? string.Empty
             };
         }
 

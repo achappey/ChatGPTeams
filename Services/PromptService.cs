@@ -4,18 +4,20 @@ using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Repositories;
 using achappey.ChatGPTeams.Extensions;
 using System.Linq;
+using AutoMapper;
 
 namespace achappey.ChatGPTeams.Services;
 
 public interface IPromptService
 {
-    Task<Prompt> GetPromptAsync(string id);
+    Task<Prompt> GetPromptAsync(int id);
     Task<IEnumerable<Prompt>> GetMyPromptsAsync();
     Task<IEnumerable<Prompt>> GetPromptByContentAsync(string content);
     Task<IEnumerable<string>> GetCategories();
-    Task<string> CreatePromptAsync(Prompt prompt);
+    Task<int> CreatePromptAsync(Prompt prompt);
     Task UpdatePromptAsync(Prompt prompt);
-    Task DeletePromptAsync(string id);
+    Task<IEnumerable<Prompt>> GetMyPromptsByCategoryAsync(string category);
+    Task DeletePromptAsync(int id);
 }
 
 public class PromptService : IPromptService
@@ -24,89 +26,78 @@ public class PromptService : IPromptService
     private readonly IUserService _userService;
     private readonly IDepartmentRepository _departmentRepository;
     private readonly IFunctionRepository _functionRepository;
+    private readonly IMapper _mapper;
 
-    public PromptService(IPromptRepository promptRepository, IUserService userService,
+    public PromptService(IPromptRepository promptRepository, IUserService userService, IMapper mapper,
     IFunctionRepository functionRepository, IDepartmentRepository departmentRepository)
     {
         _promptRepository = promptRepository;
         _userService = userService;
         _departmentRepository = departmentRepository;
         _functionRepository = functionRepository;
+        _mapper = mapper;
     }
 
     public async Task<IEnumerable<Prompt>> GetPromptByContentAsync(string content)
     {
         var user = await _userService.GetCurrentUser();
+        var items = await _promptRepository.GetPromptsByContent(content, user.Id, user.Department?.Name);
 
-        return await EnrichPromptsAsync(await _promptRepository.GetPromptsByContent(content, user.Id, user.Department?.Id.ToInt()));
+        return items.Select(_mapper.Map<Prompt>);
     }
 
     public async Task<IEnumerable<Prompt>> GetMyPromptsAsync()
     {
         var user = await _userService.GetCurrentUser();
 
-        return await EnrichPromptsAsync(await _promptRepository.GetPromptsByUser(user.Id, user.Department?.Id.ToInt()));
+        var items = await _promptRepository.GetPromptsByUser(user.Id, user.Department.Name);
+        var users = await _userService.GetAll();
+        
+        return items.Select(item =>
+        {
+            var mappedPrompt = _mapper.Map<Prompt>(item);
+            var owner = users.FirstOrDefault(u => u.Id == mappedPrompt.Owner.Id);
+            if (owner != null)
+            {
+                mappedPrompt.Owner.DisplayName = owner.DisplayName;
+            }
+            return mappedPrompt;
+        });
+    }
+
+    public async Task<IEnumerable<Prompt>> GetMyPromptsByCategoryAsync(string category)
+    {
+        var items = await GetMyPromptsAsync();
+
+        return items.Where(a => a.Category == category);
     }
 
     public async Task<IEnumerable<string>> GetCategories()
     {
-        var user = await _userService.GetCurrentUser();
-
-        var items = await _promptRepository.GetPromptsByUser(user.Id, user.Department?.Id.ToInt());
-
-        return items.Select(a => a.Category).Distinct();
+        return await _promptRepository.GetCategories();
     }
 
-    private async Task<IEnumerable<Prompt>> EnrichPromptsAsync(IEnumerable<Prompt> prompts)
+    public async Task<Prompt> GetPromptAsync(int id)
     {
-        var items = new List<Prompt>();
+        var item = await _promptRepository.Get(id);
 
-        foreach (var prompt in prompts)
-        {
-            items.Add(await EnrichPromptAsync(prompt));
-        }
-
-        return items.OrderBy(a => a.Title);
-    }
-
-    private async Task<Prompt> EnrichPromptAsync(Prompt prompt)
-    {
-        prompt.Owner = await _userService.Get(prompt.Owner.Id);
-
-        if (prompt.Department != null)
-        {
-            prompt.Department = await _departmentRepository.Get(prompt.Department.Id);
-        }
-
-        var functions = new List<Function>();
-
-        foreach (var function in prompt.Functions)
-        {
-            functions.Add(await _functionRepository.Get(function.Id));
-        }
-
-        prompt.Functions = functions;
-
-        return prompt;
-    }
-
-    public async Task<Prompt> GetPromptAsync(string id)
-    {
-        return await EnrichPromptAsync(await _promptRepository.Get(id));
+        return _mapper.Map<Prompt>(item);
     }
 
     public async Task UpdatePromptAsync(Prompt prompt)
     {
-        await _promptRepository.Update(prompt);
+        await _promptRepository.Update(_mapper.Map<Database.Models.Prompt>(prompt));
     }
 
-    public async Task<string> CreatePromptAsync(Prompt prompt)
+    public async Task<int> CreatePromptAsync(Prompt prompt)
     {
-        return await _promptRepository.Create(prompt);
+        return await _promptRepository.Create(_mapper.Map<Database.Models.Prompt>(prompt));
     }
 
-    public async Task DeletePromptAsync(string id)
+    public async Task DeletePromptAsync(int id)
     {
         await _promptRepository.Delete(id);
     }
 }
+
+

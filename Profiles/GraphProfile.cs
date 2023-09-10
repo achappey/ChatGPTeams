@@ -40,6 +40,10 @@ public class GraphProfile : Profile
         CreateMap<Microsoft.Graph.SitePage, Models.Graph.Page>();
         CreateMap<Microsoft.Graph.DateTimeTimeZone, Models.Graph.DateTimeTimeZone>();
 
+
+        CreateMap<Microsoft.Graph.User, Models.User>()
+            .ForMember(dest => dest.Department, opt => opt.MapFrom(src => src.Department != null ? new Department() {Name = src.Department} : null));
+
         CreateMap<Microsoft.Graph.ConversationMember, User>();
         CreateMap<Microsoft.Graph.ChatMessage, Models.Graph.Resource>()
             .ForMember(dest => dest.WebUrl, opt => opt.MapFrom(src => src.AdditionalData["webLink"].ToString()));
@@ -59,7 +63,6 @@ public class GraphProfile : Profile
               .ForMember(dest => dest.Title, opt => opt.MapFrom(src => src.ReactionType));
 
         CreateMap<Microsoft.Graph.ChatMessage, Message>()
-               .ForMember(dest => dest.Reactions, opt => opt.MapFrom(src => src.Reactions))
                .ForMember(dest => dest.Created, opt => opt.MapFrom(src => src.CreatedDateTime.Value))
                .ForMember(dest => dest.Role, opt => opt.MapFrom(src => src.From.Application != null ? Role.assistant : Role.user))
                .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.From.Application != null ? null : src.From.User.DisplayName.ToChatHandle()))

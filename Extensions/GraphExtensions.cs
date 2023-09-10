@@ -13,6 +13,13 @@ namespace achappey.ChatGPTeams.Extensions
     {
 
 
+        public static (int TotalItems, int TotalPages) CalculatePaging<T>(ICollectionPage<T> resultsPage, int pageSize)
+        {
+            int totalItems = resultsPage.Count();
+            int totalPages = (int)Math.Ceiling((double)totalItems / pageSize);
+
+            return (totalItems, totalPages);
+        }
         public static string GetFieldValue(this ListItem message, string field)
         {
             if (message.Fields.AdditionalData.ContainsKey(field))
@@ -51,7 +58,7 @@ namespace achappey.ChatGPTeams.Extensions
         {
             return new Models.User()
             {
-                Id = item.GetProperty("LookupId").GetInt32(),
+                Id = item.GetProperty("LookupId").GetInt32().ToString(),
                 DisplayName = item.GetProperty("LookupValue").ToString()
             };
         }
@@ -113,13 +120,13 @@ namespace achappey.ChatGPTeams.Extensions
                     {
                         if (href.StartsWith("http"))
                         {
-                            resources.Add(new Resource { Url = href, Name = attachment.ToAttachmentName(), Id = "" });
+                            resources.Add(new Resource { Url = href, Name = attachment.ToAttachmentName(), Id = 0 });
                         }
                     }
 
                     break;
                 case Models.ContentType.DOWNLOAD:
-                    resources.Add(new Resource { Url = attachment.ContentUrl, Name = attachment.Name, Id = "" });
+                    resources.Add(new Resource { Url = attachment.ContentUrl, Name = attachment.Name, Id = 0 });
                     break;
                 default:
                     break;

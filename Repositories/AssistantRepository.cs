@@ -1,10 +1,11 @@
 using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Config.SharePoint;
+using achappey.ChatGPTeams.Database;
 using achappey.ChatGPTeams.Extensions;
-using achappey.ChatGPTeams.Models;
+using achappey.ChatGPTeams.Database.Models;
 using AutoMapper;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 using Microsoft.Graph;
 
@@ -12,11 +13,11 @@ namespace achappey.ChatGPTeams.Repositories;
 
 public interface IAssistantRepository
 {
-    Task<Assistant> Get(string id);
+    Task<Assistant> Get(int id);
     Task<Assistant> GetByName(string name);
-    Task<string> Create(Assistant assistant);
+    Task<int> Create(Assistant assistant);
     Task Update(Assistant assistant);
-    Task Delete(string id);
+    Task Delete(int id);
     Task<IEnumerable<Assistant>> GetAll();
 
 }
@@ -27,16 +28,17 @@ public class AssistantRepository : IAssistantRepository
     private readonly ILogger<AssistantRepository> _logger;
     private readonly IMapper _mapper;
     private readonly IGraphClientFactory _graphClientFactory;
-
+    private readonly ChatGPTeamsContext _context;
     private readonly string _selectQuery = $"{FieldNames.Title},{FieldNames.AIPrompt},{FieldNames.AIModel},{FieldNames.AIDepartment.ToLookupField()},{FieldNames.AIDepartment},{FieldNames.AIFunctions},{FieldNames.AITemperature},{FieldNames.AIOwners},{FieldNames.AIVisibility}";
 
     public AssistantRepository(ILogger<AssistantRepository> logger,
-    AppConfig config, IMapper mapper,
+    AppConfig config, IMapper mapper, ChatGPTeamsContext chatGPTeamsContext,
     IGraphClientFactory graphClientFactory)
     {
         _siteId = config.SharePointSiteId;
         _logger = logger;
         _mapper = mapper;
+        _context = chatGPTeamsContext;
         _graphClientFactory = graphClientFactory;
     }
 
@@ -47,75 +49,86 @@ public class AssistantRepository : IAssistantRepository
             return _graphClientFactory.Create();
         }
     }
-
-    public async Task<Assistant> Get(string id)
+   
+    public async Task<Assistant> Get(int id)
     {
-        var item = await GraphService.GetListItemFromListAsync(_siteId, ListNames.AIAssistants, id, _selectQuery);
-
-        return _mapper.Map<Assistant>(item);
+        return await _context.Assistants
+        .Include(a => a.Model)
+        .Include(a => a.Owner)
+        .Include(a => a.Resources)
+        .Include(a => a.Functions)
+        .FirstOrDefaultAsync(a => a.Id == id);
+        //return _mapper.Map<Assistant>(item);
     }
 
     public async Task<Assistant> GetByName(string name)
     {
-        var item = await GraphService.GetFirstListItemFromListAsync(_siteId, ListNames.AIAssistants, $"fields/{FieldNames.Title} eq '{name}'", _selectQuery);
-
+        var item = await _context.Assistants
+                                 .Include(a => a.Model)
+                                 .Include(a => a.Owner)
+                                 .Include(a => a.Resources)
+                                 .Include(a => a.Functions)
+                                 .FirstOrDefaultAsync(a => a.Name == name);
         return _mapper.Map<Assistant>(item);
     }
 
     public async Task<IEnumerable<Assistant>> GetAll()
     {
-        var items = await GraphService.GetAllListItemFromListAsync(_siteId, ListNames.AIAssistants, _selectQuery);
-
-        return items.Select(a => _mapper.Map<Assistant>(a));
+        return await _context.Assistants
+        .Include(a => a.Model)
+        .Include(a => a.Resources)
+        .Include(a => a.Functions)
+        .Include(a => a.Owner)
+        .ToListAsync();
     }
 
-
-    public async Task<string> Create(Assistant assistant)
+    public async Task<int> Create(Assistant assistant)
     {
-        var newAssistant = new Dictionary<string, object>()
-                    {
-                        {FieldNames.Title, assistant.Name},
-                        {FieldNames.AIPrompt, assistant.Prompt},
-                        {FieldNames.AITemperature, assistant.Temperature},
-                        {FieldNames.AIModel, assistant.Model},
-                        {FieldNames.AIVisibility, assistant.Visibility.ToValue()},
-                        {FieldNames.AIOwners.ToLookupField() + "@odata.type", "Collection(Edm.Int32)"},
-                        {FieldNames.AIOwners.ToLookupField(), assistant.Owners?.Select(a => a.Id)},
-                        {FieldNames.AIDepartment.ToLookupField(), assistant.Department?.Id.ToInt()},
-                        {FieldNames.AIFunctions.ToLookupField() + "@odata.type", "Collection(Edm.Int32)"},
-                        {FieldNames.AIFunctions.ToLookupField(), assistant.Functions.Select(a => a.Id.ToInt())}
-                    }.ToListItem();
-
-        // Add the new assistant
-        var createdAssistant = await GraphService.Sites[_siteId].Lists[ListNames.AIAssistants].Items
-            .Request()
-            .AddAsync(newAssistant);
-
-        return createdAssistant.Id;
+        try
+        {
+            //_context.Attach(assistant.Owners.First());
+            await _context.Assistants.AddAsync(assistant);
+            await _context.SaveChangesAsync();
+            return assistant.Id;
+        }
+        catch (DbUpdateException ex)
+        {
+            // Log the detailed error
+            _logger.LogError(ex.InnerException?.Message ?? ex.Message);
+            throw;
+        }
     }
 
     public async Task Update(Assistant assistant)
     {
-        var assistantToUpdate = new Dictionary<string, object>()
-                    {
-                        { FieldNames.Title, assistant.Name },
-                        { FieldNames.AIPrompt, assistant.Prompt },
-                        { FieldNames.AIDepartment.ToLookupField(), assistant.Department?.Id.ToInt()},
-                        { FieldNames.AITemperature, assistant.Temperature},
-                        { FieldNames.AIVisibility, assistant.Visibility.ToValue()},
-                        { FieldNames.AIFunctions.ToLookupField() + "@odata.type", "Collection(Edm.Int32)"},
-                        { FieldNames.AIFunctions.ToLookupField(), assistant.Functions.Select(a => a.Id.ToInt())}
-                    }.ToFieldValueSet();
 
-        await GraphService.Sites[_siteId].Lists[ListNames.AIAssistants].Items[assistant.Id].Fields
-            .Request()
-            .UpdateAsync(assistantToUpdate);
+        var existingConversation = await _context.Assistants
+                                        .FirstOrDefaultAsync(c => c.Id == assistant.Id);
+
+        // Update the properties of the existing conversation
+        if (existingConversation != null)
+        {
+            existingConversation.Prompt = assistant.Prompt;
+            existingConversation.Name = assistant.Name;
+            existingConversation.DepartmentId = assistant.Department?.Id;
+            existingConversation.Temperature = assistant.Temperature;
+            existingConversation.OwnerId = assistant.Owner.Id;
+            existingConversation.Visibility = assistant.Visibility;
+
+            _context.Assistants.Update(existingConversation);
+        }
+
+        await _context.SaveChangesAsync();
     }
 
-    public async Task Delete(string id)
+    public async Task Delete(int id)
     {
-        await GraphService.Sites[_siteId].Lists[ListNames.AIAssistants].Items[id]
-         .Request()
-         .DeleteAsync();
+        var assistantToDelete = await _context.Assistants.FindAsync(id);
+        if (assistantToDelete != null)
+        {
+            _context.Assistants.Remove(assistantToDelete);
+            await _context.SaveChangesAsync();
+        }
+        // Handle not found scenario as needed.
     }
 }

@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Repositories;
+using AutoMapper;
 using Microsoft.Bot.Schema;
 using Newtonsoft.Json;
 
@@ -21,57 +22,73 @@ public interface IFunctionService
     Task DeleteFunctionFromConversationAsync(ConversationReference reference, string functionName);
     Task AddFunctionResult(ConversationReference reference, FunctionCall functionCall, string result);
     Task HandleFunctionMissing(ConversationReference reference, FunctionCall functionCall);
-    Task<IEnumerable<Function>> GetFunctionsByConversation(string conversationTitle);
+    //Task<IEnumerable<Function>> GetFunctionsByConversation(string conversationTitle);
+    Task<IEnumerable<Function>> GetFunctionsByFiltersAsync(string publisher = null, string category = null);
+    Task<IEnumerable<string>> GetFunctionsPublishersAsync();
+    Task<IEnumerable<string>> GetFunctionsCategoriesAsync();
+
 
 }
 
 public class FunctionService : IFunctionService
 {
     private readonly IFunctionRepository _functionRepository;
+    private readonly IFunctionDefinitonRepository _functionDefinitonRepository;
     private readonly IConversationRepository _conversationRepository;
     private readonly IMessageRepository _messageRepository;
+    private readonly IMapper _mapper;
     private readonly IAssistantRepository _assistantRepository;
 
-    public FunctionService(IFunctionRepository functionRepository,
-        IConversationRepository conversationRepository, IAssistantRepository assistantRepository,
-        IMessageRepository messageRepository)
+    public FunctionService(
+        IFunctionRepository functionRepository,
+        IConversationRepository conversationRepository,
+        IFunctionDefinitonRepository functionDefinitonRepository,
+        IAssistantRepository assistantRepository,
+        IMessageRepository messageRepository,
+        IMapper mapper) // Add this line
     {
         _functionRepository = functionRepository;
         _conversationRepository = conversationRepository;
         _assistantRepository = assistantRepository;
         _messageRepository = messageRepository;
+        _functionDefinitonRepository = functionDefinitonRepository;
+        _mapper = mapper; // Add this line
     }
 
     public async Task<Function> GetFunctionByNameAsync(string name)
     {
-        return await _functionRepository.GetByName(name);
+        var items = await _functionDefinitonRepository.GetByNames(new List<string>() { name });
+
+        return items.FirstOrDefault();
     }
 
     public async Task AddFunctionRequest(ConversationReference reference, Function function, FunctionCall functionCall)
     {
-        var conversation = await _conversationRepository.GetByTitle(reference.Conversation.Id);
+        var conversation = await _conversationRepository.Get(reference.Conversation.Id);
 
-        await _messageRepository.Create(new Message()
+        await _messageRepository.Create(new Database.Models.Message()
         {
-            Role = Role.assistant,
-            Name = functionCall.Name,
+            Role = Database.Models.Role.assistant,
+            Created = DateTimeOffset.Now,
+            Content = "",
             ConversationId = conversation.Id,
-            Reference = reference,
-            FunctionCall = functionCall
+            Reference = reference != null ? JsonConvert.SerializeObject(reference) : null,
+            FunctionCall = functionCall != null ? JsonConvert.SerializeObject(functionCall) : null
         });
     }
 
     public async Task HandleFunctionMissing(ConversationReference reference, FunctionCall functionCall)
     {
-        var conversation = await _conversationRepository.GetByTitle(reference.Conversation.Id);
+        var conversation = await _conversationRepository.Get(reference.Conversation.Id);
 
-        await _messageRepository.Create(new Message()
+        await _messageRepository.Create(new Database.Models.Message()
         {
-            Role = Role.assistant,
+            Role = Database.Models.Role.assistant,
             ConversationId = conversation.Id,
             Name = functionCall.Name,
-            Reference = reference,
-            FunctionCall = functionCall
+            Created = DateTimeOffset.Now,
+            Reference = reference != null ? JsonConvert.SerializeObject(reference) : null,
+            FunctionCall = functionCall != null ? JsonConvert.SerializeObject(functionCall) : null
         });
 
         await AddFunctionResult(reference, functionCall, JsonConvert.SerializeObject(NotFoundResponse(functionCall.Name)));
@@ -87,60 +104,105 @@ public class FunctionService : IFunctionService
         };
     }
 
-
     public async Task AddFunctionResult(ConversationReference reference, FunctionCall functionCall, string result)
     {
-        var conversation = await _conversationRepository.GetByTitle(reference.Conversation.Id);
+        var conversation = await _conversationRepository.Get(reference.Conversation.Id);
 
-        await _messageRepository.Create(new Message()
+        await _messageRepository.Create(new Database.Models.Message()
         {
-            Role = Role.function,
+            //Role = Role.function,
+            Role = Database.Models.Role.function,
             Content = result,
+            Created = DateTimeOffset.Now,
             Name = functionCall.Name,
             ConversationId = conversation.Id,
-            Reference = reference
+            Reference = reference != null ? JsonConvert.SerializeObject(reference) : null,
         });
     }
 
     public async Task AddFunctionToConversationAsync(ConversationReference reference, string functionName)
     {
-        var function = await _functionRepository.GetByName(functionName);
-        var conversation = await _conversationRepository.GetByTitle(reference.Conversation.Id);
-        var functions = conversation.Functions.ToList();
-        functions.Add(function);
-        conversation.Functions = functions;
+        await _conversationRepository.AddFunction(reference.Conversation.Id, functionName);
+        //var function = await _functionRepository.Get(functionName);
+        //var conversation = await _conversationRepository.Get(reference.Conversation.Id);
+        //await _conversationRepository.AddFunction(new Database.Models.ConversationFunction()
+        // {
+        //  ConversationId = reference.Conversation.Id,
+        //   FunctionId = functionName
+        // });
+        //        var functions = conversation.Functions.ToList();
+        //      functions.Add(function);
+        //    conversation.Functions = functions;
 
-        await _conversationRepository.Update(conversation);
+        //  await _conversationRepository.Update(conversation);
     }
 
     public async Task DeleteFunctionFromConversationAsync(ConversationReference reference, string functionName)
     {
-        var conversation = await _conversationRepository.GetByTitle(reference.Conversation.Id);
-        conversation.Functions = conversation.Functions.Where(a => a.Name != functionName);
-        await _conversationRepository.Update(conversation);
+        await _conversationRepository.DeleteFunction(reference.Conversation.Id, functionName);
+
+        //  var conversation = await _conversationRepository.Get(reference.Conversation.Id);
+        //     conversation.Functions = conversation.Functions.Where(a => a.Id != functionName);
+        //  await _conversationRepository.Update(conversation);
     }
 
     public async Task<Function> GetFunctionAsync(string id)
     {
-        return await _functionRepository.Get(id);
+        var item = await _functionRepository.Get(id);
+
+        return _mapper.Map<Function>(item);
     }
 
     public async Task<IEnumerable<Function>> GetAllFunctionsAsync()
     {
-        return await _functionRepository.GetAll();
+        var items = await _functionDefinitonRepository.GetAll();
+
+        return items;
+        //  return items.Select(_mapper.Map<Function>);
     }
 
-    public async Task<IEnumerable<Function>> GetFunctionsByConversation(string conversationTitle)
+    public async Task<IEnumerable<Function>> GetFunctionsByFiltersAsync(string publisher = null, string category = null)
     {
-        var conversation = await _conversationRepository.GetByTitle(conversationTitle);
-        var assistant = await _assistantRepository.Get(conversation.Assistant.Id);
+        var items = await _functionDefinitonRepository.GetAll();
 
-        // Assuming assistant.Functions is also a collection of Functions
-        var assistantFunctions = assistant.Functions;
+        if (!string.IsNullOrEmpty(publisher))
+        {
+            items = items.Where(a => a.Publisher.ToLowerInvariant().Contains(publisher.ToLowerInvariant()));
+        }
 
-        // Concatenating the functions from conversation and assistant
-        var combinedFunctions = conversation.Functions.Concat(assistantFunctions);
+        if (!string.IsNullOrEmpty(category))
+        {
+            items = items.Where(a => a.Category.ToLowerInvariant().Contains(category.ToLowerInvariant()));
+        }
 
-        return combinedFunctions;
+        return items;
     }
+
+    public async Task<IEnumerable<string>> GetFunctionsPublishersAsync()
+    {
+        var items = await _functionDefinitonRepository.GetAll();
+
+        return items.Select(a => a.Publisher).Distinct();
+    }
+
+    public async Task<IEnumerable<string>> GetFunctionsCategoriesAsync()
+    {
+        var items = await _functionRepository.GetAll();
+
+        return items.Select(a => "").Distinct();
+    }
+
+    /*   public async Task<IEnumerable<Function>> GetFunctionsByConversation(string conversationTitle)
+       {
+           var conversation = await _conversationRepository.GetByTitle(conversationTitle);
+           var assistant = await _assistantRepository.Get(conversation.Assistant.Id);
+
+           // Assuming assistant.Functions is also a collection of Functions
+           var assistantFunctions = assistant.Functions;
+
+           // Concatenating the functions from conversation and assistant
+           var combinedFunctions = conversation.Functions.Concat(assistantFunctions);
+
+           return combinedFunctions;
+       }*/
 }

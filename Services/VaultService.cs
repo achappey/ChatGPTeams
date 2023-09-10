@@ -117,7 +117,7 @@ public class VaultService : IVaultService
 
     private async Task<bool> CheckAccess(User currentUser, IEnumerable<User> users)
     {
-        var allUsers = await _userRepository.GetAll();
+       /* var allUsers = await _userRepository.GetAll();
         var filteredUsers = users.SelectMany(z => allUsers.Where(a => a.Id == z.Id));
         if (filteredUsers.Any(u => u.Id == currentUser.Id)) return true;
 
@@ -125,7 +125,7 @@ public class VaultService : IVaultService
         foreach (var group in groups)
         {
             if (await _userRepository.IsMemberOf(group.Mail)) return true;
-        }
+        }*/
 
         return false;
     }

@@ -7,7 +7,7 @@ namespace achappey.ChatGPTeams.Models
 {
     public class Prompt
     {
-        public string Id { get; set; } = null!;
+        public int Id { get; set; }
 
         public string Content { get; set; } = null!;
         

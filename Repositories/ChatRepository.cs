@@ -8,7 +8,6 @@ using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
 using SharpToken;
-using System.Web;
 
 namespace achappey.ChatGPTeams.Repositories;
 
@@ -42,7 +41,7 @@ public class ChatRepository : IChatRepository
 
         return new ChatCompletionCreateRequest
         {
-            Model = conversation.Assistant.Model,
+            Model = conversation.Assistant.Model.Name,
             Temperature = conversation.Temperature,
             Messages = messages,
             Functions = conversation.FunctionDefinitions?.Count() > 0 ? conversation.FunctionDefinitions?.ToList() : null,
@@ -62,7 +61,7 @@ public class ChatRepository : IChatRepository
 
     private IAsyncEnumerable<Message> ChatWithFallback(Conversation chat)
     {
-        int maxTokenSize = chat.Assistant.Model == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
+        int maxTokenSize = chat.Assistant.Model.Name == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
         var encoding = GptEncoding.GetEncoding("cl100k_base");
 
         // Calculate the total token size
@@ -87,14 +86,20 @@ public class ChatRepository : IChatRepository
 
         await foreach (var response in _openAIService.ChatCompletion.CreateCompletionAsStream(chatCompletionRequest))
         {
-            var message = response.Choices.FirstOrDefault()?.Message;
-            yield return _mapper.Map<Message>(message);
+            if (response.Successful)
+            {
+                var message = response.Choices.FirstOrDefault()?.Message;
+                yield return _mapper.Map<Message>(message);
+            }
+            else {
+                throw new Exception(response.Error.Message);
+            }
         }
     }
 
     private IAsyncEnumerable<Message> ChatWithBestContextStreamAsync(IEnumerable<EmbeddingScore> topResults, Conversation chat)
     {
-        int maxTokenSize = chat.Assistant.Model == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
+        int maxTokenSize = chat.Assistant.Model.Name == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
 
         var encoding = GptEncoding.GetEncoding("cl100k_base");
 
@@ -104,11 +109,10 @@ public class ChatRepository : IChatRepository
                 .Sum(encoded => encoded.Count());
 
         int remainingTokensAfterChat = maxTokenSize - chatHistoryTokens;
-        //int maxChatTokenSize = (maxTokenSize / 3) * 2;
         int reservedTokensForEmbeddings = (remainingTokensAfterChat > maxTokenSize / 3) ? remainingTokensAfterChat : maxTokenSize / 3;
 
         // If chat history exceeds its 50% quota, trim it
-        while (chatHistoryTokens > maxTokenSize / 3 && chat.Messages.Count > 0)
+        while (chatHistoryTokens > maxTokenSize / 3 && chat.Messages.Count > 1)
         {
             var oldestMessage = chat.Messages.First();
             chatHistoryTokens -= encoding.Encode(oldestMessage.Content).Count();

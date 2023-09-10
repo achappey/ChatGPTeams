@@ -1,8 +1,6 @@
 using AutoMapper;
 using System.Collections.Generic;
 using System.Linq;
-using achappey.ChatGPTeams.Extensions;
-using achappey.ChatGPTeams.Models;
 using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
@@ -19,14 +17,12 @@ public interface IImageRepository
 public class ImageRepository : IImageRepository
 {
     private readonly ILogger<ChatRepository> _logger;
-    private readonly IMapper _mapper;
     private readonly OpenAIService _openAIService;
 
     public ImageRepository(ILogger<ChatRepository> logger,
-    OpenAIService openAIService, IMapper mapper)
+    OpenAIService openAIService)
     {
         _logger = logger;
-        _mapper = mapper;
         _openAIService = openAIService;
     }
 

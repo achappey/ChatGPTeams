@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 
 namespace achappey.ChatGPTeams.Models
 {
@@ -12,18 +13,19 @@ namespace achappey.ChatGPTeams.Models
 
         public Department Department { get; set; }
 
-        public string Id { get; set; }
+        public int Id { get; set; }
 
         public float Temperature { get; set; }
 
         public IEnumerable<Function> Functions { get; set; }
 
-        public IEnumerable<User> Owners { get; set; }
+//        public IEnumerable<User> Owners { get; set; }
+        public User Owner { get; set; }
+
+        public Model Model { get; set; }
 
         public IEnumerable<Resource> Resources { get; set; }
 
-        public string Model { get; set; }
-        
         public Visibility Visibility { get; set; }
 
         public Assistant()

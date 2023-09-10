@@ -11,6 +11,7 @@ public static class FieldNames
     public const string AIItemType = "ItemType";
     public const string ContentType = "ContentType";
     public const string AIAssistant = "Assistant";
+    public const string AITeam = "Team";
     public const string AICutOff = "CutOff";
     public const string AITemperature = "Temperature";
     public const string AIVisibility = "Visibility";

@@ -1,18 +1,22 @@
-﻿using System.Collections.Generic;
+﻿using System;
+using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
+using System.Web;
 using achappey.ChatGPTeams.Attributes;
+using achappey.ChatGPTeams.Extensions;
 using Microsoft.Graph;
+using Microsoft.Recognizers.Text.DateTime.Utilities;
 
 namespace achappey.ChatGPTeams.Services.Graph
 {
     public partial class GraphFunctionsClient
     {
-        // Search for members based on department, display name, or mail.
-        [MethodDescription("Searches for members based on department, display name or mail.")]
-        public async Task<IEnumerable<Models.Graph.User>> SearchMembers([ParameterDescription("The department to filter on.")] string department = null,
+        [MethodDescription("Users|Searches for members based on department, display name or mail.")]
+        public async Task<string> SearchMembers([ParameterDescription("The department to filter on.")] string department = null,
                                                                         [ParameterDescription("The display name to filter on.")] string displayName = null,
-                                                                        [ParameterDescription("The mail to filter on.")] string mail = null)
+                                                                        [ParameterDescription("The mail to filter on.")] string mail = null,
+                                                                        [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
             string searchQuery = null;
@@ -29,29 +33,31 @@ namespace achappey.ChatGPTeams.Services.Graph
             }
 
             var filterOptions = new List<QueryOption>()
-            {
-                new QueryOption("$filter", filterQuery)
-            };
+              {
+                  new QueryOption("$filter", filterQuery)
+              };
 
             if (!string.IsNullOrEmpty(searchQuery))
             {
                 filterOptions.Add(new QueryOption("$search", searchQuery));
             }
 
-            var users = await graphClient.Users
-            .Request(filterOptions)
-            .Top(10)
-            .Header("ConsistencyLevel", "eventual")
-            .GetAsync();
+            if (!string.IsNullOrEmpty(skipToken))
+            {
+                filterOptions.Add(new QueryOption("$skiptoken", skipToken));
+            }
 
-            return users.CurrentPage.Select(u => _mapper.Map<Models.Graph.User>(u));
+            var users = await graphClient.Users.Request(filterOptions)
+                                        .Top(10).Header("ConsistencyLevel", "eventual").GetAsync();
+
+            return users.CurrentPage.Select(_mapper.Map<Models.Graph.User>).ToHtmlTable(users.NextPageRequest?.QueryOptions.FirstOrDefault(a => a.Name == "$skiptoken")?.Value);
         }
 
-        // Search for guests based on company name, display name, or mail.
-        [MethodDescription("Searches for guest users based on company name, display name or mail.")]
-        public async Task<IEnumerable<Models.Graph.User>> SearchGuests([ParameterDescription("The company name to filter on.")] string companyName = null,
+        [MethodDescription("Users|Searches for guest users based on company name, display name or mail.")]
+        public async Task<string> SearchGuests([ParameterDescription("The company name to filter on.")] string companyName = null,
                                                                        [ParameterDescription("The display name to filter on.")] string displayName = null,
-                                                                       [ParameterDescription("The mail to filter on.")] string mail = null)
+                                                                       [ParameterDescription("The mail to filter on.")] string mail = null,
+                                                                       [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
 
@@ -78,18 +84,23 @@ namespace achappey.ChatGPTeams.Services.Graph
                 filterOptions.Add(new QueryOption("$search", searchQuery));
             }
 
+            if (!string.IsNullOrEmpty(skipToken))
+            {
+                filterOptions.Add(new QueryOption("$skiptoken", skipToken));
+            }
+
             var users = await graphClient.Users
             .Request(filterOptions)
             .Top(10)
             .Header("ConsistencyLevel", "eventual")
             .GetAsync();
 
-            return users.CurrentPage.Select(u => this._mapper.Map<Models.Graph.User>(u));
+            return users.CurrentPage.Select(_mapper.Map<Models.Graph.User>).ToHtmlTable(users.NextPageRequest?.QueryOptions.FirstOrDefault(a => a.Name == "$skiptoken")?.Value);
         }
 
 
         // Get information about a specific user by their ID.
-        [MethodDescription("Gets information about a specific user based on their ID.")]
+        [MethodDescription("Users|Gets information about a specific user based on their ID.")]
         public async Task<Models.Graph.User> GetUser(
             [ParameterDescription("The ID of the user.")] string userId)
         {
@@ -99,7 +110,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return _mapper.Map<Models.Graph.User>(user);
         }
 
-        [MethodDescription("Creates a user with the specified properties.")]
+        [MethodDescription("Users|Creates a user with the specified properties.")]
         public async Task<Models.Graph.User> CreateUser([ParameterDescription("The nickname of the user.")] string nickname,
                                                         [ParameterDescription("The department of the user.")] string department,
                                                         [ParameterDescription("The display name of the user.")] string displayName,
@@ -135,7 +146,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return _mapper.Map<Models.Graph.User>(createdUser);
         }
 
-        [MethodDescription("Updates the user's information with the specified properties.")]
+        [MethodDescription("Users|Updates the user's information with the specified properties.")]
         public async Task<Models.Graph.User> UpdateUser([ParameterDescription("The ID of the user to update.")] string userId,
                                                         [ParameterDescription("The nickname of the user.")] string nickname = null,
                                                         [ParameterDescription("The department of the user.")] string department = null,

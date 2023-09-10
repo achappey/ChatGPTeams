@@ -11,7 +11,7 @@ namespace achappey.ChatGPTeams.Models
     /// </summary>
     public class Message
     {
-        public string Id { get; set; } = null!;
+        public string Id { get; set; }
 
         public string ConversationId { get; set; } = null!;
 
@@ -26,22 +26,16 @@ namespace achappey.ChatGPTeams.Models
         public string? Content { get; set; }
 
         public string? Name { get; set; }
+
         public string? TeamsId { get; set; }
 
         public ChatType ChatType { get; set; }
 
         public FunctionCall? FunctionCall { get; set; }
 
-      /// <summary>
-      ///  public string? Function { get; set; }
-      /// </summary>
-
         public DateTimeOffset? Created { get; set; }
 
         public ConversationReference Reference { get; set; } = null!;
-
-        public IEnumerable<Reaction>? Reactions { get; set; }
-
     }
 
 

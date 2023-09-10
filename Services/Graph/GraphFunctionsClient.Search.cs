@@ -2,6 +2,7 @@
 using System.Linq;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Attributes;
+using achappey.ChatGPTeams.Extensions;
 using Microsoft.Graph;
 
 namespace achappey.ChatGPTeams.Services.Graph
@@ -11,29 +12,33 @@ namespace achappey.ChatGPTeams.Services.Graph
     public partial class GraphFunctionsClient
     {
 
-        [MethodDescription("Searches across SharePoint and OneDrive resources.")]
-        public async Task<IEnumerable<Models.Graph.SearchHit>> SearchDriveContent(
-            [ParameterDescription("The search query.")] string query)
+
+        [MethodDescription("SharePoint|Searches content across SharePoint and OneDrive resources.")]
+        public async Task<string> SearchDriveContent(
+            [ParameterDescription("The search query.")] string query,
+            [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
-            return await SearchContent(query, EntityType.DriveItem);
+            return await SearchContent(query, EntityType.DriveItem, skipToken);
         }
 
-        [MethodDescription("Searches Outlook messages.")]
-        public async Task<IEnumerable<Models.Graph.SearchHit>> SearchOutlookContent(
-                    [ParameterDescription("The search query.")] string query)
+        [MethodDescription("Mail|Searches Outlook messages.")]
+        public async Task<string> SearchOutlookContent(
+                    [ParameterDescription("The search query.")] string query,
+                    [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
-            return await SearchContent(query, EntityType.Message);
+            return await SearchContent(query, EntityType.Message, skipToken);
         }
 
-        [MethodDescription("Searches chat messages.")]
-        public async Task<IEnumerable<Models.Graph.SearchHit>> SearchChatContent(
-                          [ParameterDescription("The search query.")] string query)
+        [MethodDescription("Teams|Searches chat messages.")]
+        public async Task<string> SearchChatContent(
+                              [ParameterDescription("The search query.")] string query,
+                              [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
-            return await SearchContent(query, EntityType.ChatMessage);
+            return await SearchContent(query, EntityType.ChatMessage, skipToken);
         }
 
-        private async Task<IEnumerable<Models.Graph.SearchHit>> SearchContent(
-                          string query, EntityType type)
+        private async Task<string> SearchContent(
+                              string query, EntityType type, string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
 
@@ -42,26 +47,33 @@ namespace achappey.ChatGPTeams.Services.Graph
                 query = "*";
             }
 
+            var filterOptions = new List<QueryOption>();
+            if (!string.IsNullOrEmpty(skipToken))
+            {
+                filterOptions.Add(new QueryOption("$skiptoken", skipToken));
+            }
+
             var searchRequest = new SearchRequestObject()
             {
                 Query = new SearchQuery
                 {
                     QueryString = query,
                 },
-                EntityTypes = new List<EntityType> { type }
+                EntityTypes = new List<EntityType> { type },
+                From = string.IsNullOrEmpty(skipToken) ? 0 : int.Parse(skipToken),
+                Size = StringExtensions.PageSize
             };
 
             var searchResponse = await graphClient.Search
                 .Query(new List<SearchRequestObject>() {
-                    searchRequest
+                         searchRequest
                 })
-                .Request()
-                .Top(10)
+                .Request(filterOptions)
                 .PostAsync();
 
-            return searchResponse.FirstOrDefault().HitsContainers.FirstOrDefault().Hits.Select(a => _mapper.Map<Models.Graph.SearchHit>(a));
+            return searchResponse.FirstOrDefault().HitsContainers.FirstOrDefault().Hits.Select(a => _mapper.Map<Models.Graph.SearchHit>(a))
+            .ToHtmlTable(string.IsNullOrEmpty(skipToken) ? (0 + StringExtensions.PageSize).ToString() : (int.Parse(skipToken) + StringExtensions.PageSize).ToString());
         }
-
 
     }
 }

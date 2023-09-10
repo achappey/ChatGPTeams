@@ -15,7 +15,7 @@ namespace achappey.ChatGPTeams.Services.Graph
     {
 
         // Create a new channel message.
-        [MethodDescription("Creates a new channel message.")]
+        [MethodDescription("Teams|Creates a new channel message.")]
         public async Task<ChatMessage> NewChannelMessage(
             [ParameterDescription("The ID of the team.")] string teamId,
             [ParameterDescription("The ID of the channel.")] string channelId,
@@ -37,7 +37,7 @@ namespace achappey.ChatGPTeams.Services.Graph
                 .AddAsync(newMessage);
         }
 
-        [MethodDescription("Creates a reply to a specific message in a team's channel.")]
+        [MethodDescription("Teams|Creates a reply to a specific message in a team's channel.")]
         public async Task<Models.Graph.ChatMessage> NewChannelMessageReply(
     [ParameterDescription("The ID of the team.")] string teamId,
     [ParameterDescription("The ID of the channel.")] string channelId,
@@ -62,7 +62,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
         // Add a user to a team.
-        [MethodDescription("Adds a member to a team based on the user's ID and team ID.")]
+        [MethodDescription("Teams|Adds a member to a team based on the user's ID and team ID.")]
         public async Task<Models.Response> AddMemberToTeam(
             [ParameterDescription("The ID of the user.")] string userId,
             [ParameterDescription("The ID of the team.")] string teamId)
@@ -91,7 +91,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return SuccessResponse();
         }
 
-        [MethodDescription("Adds an owner to a team based on the user's ID and team ID.")]
+        [MethodDescription("Teams|Adds an owner to a team based on the user's ID and team ID.")]
         public async Task<Models.Response> AddOwnerToTeam(
          [ParameterDescription("The ID of the user.")] string userId,
          [ParameterDescription("The ID of the team.")] string teamId)
@@ -121,7 +121,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
         // Get information about a specific team by their ID.
-        [MethodDescription("Gets information about a specific team based on the ID.")]
+        [MethodDescription("Teams|Gets information about a specific team based on the ID.")]
         public async Task<Models.Graph.Team> GetTeam(
             [ParameterDescription("The ID of the team.")] string teamId)
         {
@@ -147,7 +147,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return items.Select(a => _mapper.Map<Models.Graph.Channel>(a));
         }
 
-        [MethodDescription("Gets the messages of a specific channel in a team.")]
+        [MethodDescription("Teams|Gets the messages of a specific channel in a team.")]
         public async Task<IEnumerable<Models.Graph.ChatMessage>> GetTeamChannelMessages(
       [ParameterDescription("The ID of the team.")] string teamId,
       [ParameterDescription("The ID of the channel.")] string channelId)
@@ -161,7 +161,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return items.CurrentPage.Select(a => _mapper.Map<Models.Graph.ChatMessage>(a));
         }
 
-        [MethodDescription("Gets the last 25 messages from a specific chat.")]
+        [MethodDescription("Teams|Gets the last 25 messages from a specific chat.")]
         public async Task<IEnumerable<Models.Graph.ChatMessage>> GetChatMessages(
     [ParameterDescription("The ID of the chat.")] string chatId)
         {
@@ -177,7 +177,7 @@ namespace achappey.ChatGPTeams.Services.Graph
                 .Select(a => _mapper.Map<Models.Graph.ChatMessage>(a));
         }
 
-        [MethodDescription("Creates a new message in a specific chat.")]
+        [MethodDescription("Teams|Creates a new message in a specific chat.")]
         public async Task<Models.Response> NewChatMessage(
            [ParameterDescription("The ID of the chat.")] string chatId,
            [ParameterDescription("The html content of the message.")] string content)
@@ -199,7 +199,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return SuccessResponse();
         }
 
-        [MethodDescription("Gets the replies to a specific message in a team's channel.")]
+        [MethodDescription("Teams|Gets the replies to a specific message in a team's channel.")]
         public async Task<IEnumerable<Models.Graph.ChatMessage>> GetChannelMessageReplies(
             [ParameterDescription("The ID of the team.")] string teamId,
             [ParameterDescription("The ID of the channel.")] string channelId,
@@ -216,7 +216,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
 
-        [MethodDescription("Updates a channel of a specific team based on the team ID and channel ID.")]
+        [MethodDescription("Teams|Updates a channel of a specific team based on the team ID and channel ID.")]
         public async Task<Models.Graph.Channel> UpdateTeamChannel(
             [ParameterDescription("The ID of the team.")] string teamId,
             [ParameterDescription("The ID of the channel.")] string channelId,
@@ -239,7 +239,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return this._mapper.Map<Models.Graph.Channel>(channel);
         }
 
-        [MethodDescription("Updates a team based on the team ID.")]
+        [MethodDescription("Teams|Updates a team based on the team ID.")]
         public async Task<Models.Graph.Team> UpdateTeam(
     [ParameterDescription("The ID of the team.")] string teamId,
     [ParameterDescription("The new display name for the team.")] string newDisplayName,
@@ -262,7 +262,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
 
-        [MethodDescription("Retrieves all teamwork devices. Optionally filters by the current signed-in user.")]
+        [MethodDescription("Teams|Retrieves all teamwork devices. Optionally filters by the current signed-in user.")]
         public async Task<IEnumerable<Models.Graph.TeamworkDevice>> GetTeamworkDevices()
         {
             var graphClient = GetAuthenticatedClient();
@@ -272,7 +272,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return devices.Select(t => _mapper.Map<Models.Graph.TeamworkDevice>(t));
         }
 
-        [MethodDescription("Restarts a specific teamwork device by device ID.")]
+        [MethodDescription("Teams|Restarts a specific teamwork device by device ID.")]
         public async Task<Models.Response> RestartTeamworkDevice(
             [ParameterDescription("The ID of the teamwork device to restart.")] string deviceId)
         {
@@ -284,7 +284,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return SuccessResponse();
         }
 
-        [MethodDescription("Creates a new channel within the specified Microsoft Teams.")]
+        [MethodDescription("Teams|Creates a new channel within the specified Microsoft Teams.")]
         public async Task<Models.Graph.Channel> CreateChannel(
             [ParameterDescription("The ID of the Microsoft Teams team to create the channel in.")] string teamId,
             [ParameterDescription("The name of the channel.")] string channelName,

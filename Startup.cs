@@ -12,6 +12,8 @@ using achappey.ChatGPTeams.Profiles;
 using achappey.ChatGPTeams.Services;
 using achappey.ChatGPTeams.Repositories;
 using OpenAI.Managers;
+using achappey.ChatGPTeams.Database;
+using Microsoft.EntityFrameworkCore;
 
 //ngrok http 3978 --host-header="localhost:3978"
 
@@ -62,6 +64,7 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IAssistantService, AssistantService>();
             services.AddScoped<IEmbeddingService, EmbeddingService>();
             services.AddScoped<IVaultService, VaultService>();
+            services.AddScoped<ITeamsService, TeamsService>();
 
             services.AddScoped<ITeamsChannelMembersRepository, TeamsChannelMembersRepository>();
             services.AddScoped<ITeamsChatMembersRepository, TeamsChatMembersRepository>();
@@ -71,6 +74,8 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IImageRepository, ImageRepository>();
             services.AddScoped<IConversationRepository, ConversationRepository>();
             services.AddScoped<IFunctionRepository, FunctionRepository>();
+            services.AddScoped<ITeamsRepository, TeamsRepository>();
+            services.AddScoped<IChannelRepository, ChannelRepository>();
             services.AddScoped<IFilesRepository, FilesRepository>();
             services.AddScoped<IFineTuningRepository, FineTuningRepository>();
             services.AddScoped<IDepartmentRepository, DepartmentRepository>();
@@ -80,6 +85,7 @@ namespace achappey.ChatGPTeams
             services.AddScoped<IFunctionDefinitonRepository, FunctionDefinitonRepository>();
             services.AddScoped<IChatRepository, ChatRepository>();
             services.AddScoped<IVaultRepository, VaultRepository>();
+            services.AddScoped<IDataverseRepository, DataverseRepository>();
             services.AddScoped<IUserRepository, UserRepository>();
             services.AddScoped<IMessageRepository, CompositeMessageRepository>();
             services.AddScoped<ISharePointMessageRepository, SharePointMessageRepository>();
@@ -88,7 +94,13 @@ namespace achappey.ChatGPTeams
 
             services.AddScoped<ITokenService, TokenService>();
             services.AddScoped<IGraphClientFactory, GraphClientFactory>();
+            services.AddScoped<ISimplicateClientFactory, SimplicateClientFactory>();
+            services.AddScoped<IDataverseClientFactory, DataverseClientFactory>();
             services.AddHttpClient();
+
+            services.AddDbContext<ChatGPTeamsContext>(
+                options => options.UseSqlServer(appConfig.Database)
+                .UseQueryTrackingBehavior(QueryTrackingBehavior.NoTracking));
 
             services.AddMemoryCache();
 
@@ -114,6 +126,7 @@ namespace achappey.ChatGPTeams
             {
                 mc.AddProfiles(new List<Profile>() {
                     new GraphProfile(),
+                    new DatabaseProfile(),
                     new SharePointProfile(),
                     new OpenAIProfile()
                     });

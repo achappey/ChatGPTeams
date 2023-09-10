@@ -2,10 +2,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using achappey.ChatGPTeams.Config.SharePoint;
-using achappey.ChatGPTeams.Extensions;
-using achappey.ChatGPTeams.Models;
-using AutoMapper;
+using achappey.ChatGPTeams.Database;
+using achappey.ChatGPTeams.Database.Models;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace achappey.ChatGPTeams.Repositories;
@@ -13,30 +12,25 @@ namespace achappey.ChatGPTeams.Repositories;
 public interface ISharePointMessageRepository
 {
     Task<IEnumerable<Message>> GetByConversation(string conversationId);
-    Task<string> Create(Message message);
-    Task Update(Message message);
-    Task Delete(string id);
+    Task<int> Create(Message message);
+    Task Delete(int id);
     Task DeleteByConversationAndTeamsId(string conversationId, string teamsId);
-    Task<Message> GetByConversationAndTeamsId(string conversationId, string teamsId);
     Task DeleteByConversationAndDateTime(string conversationId, DateTime date);
 }
 
 public class SharePointMessageRepository : ISharePointMessageRepository
 {
-    private readonly string _siteId;
     private readonly ILogger<SharePointMessageRepository> _logger;
-    private readonly IMapper _mapper;
+    private readonly ChatGPTeamsContext _context; // Add this line for DbContext
     private readonly IGraphClientFactory _graphClientFactory;
-    private readonly string _selectQuery = $"{FieldNames.AIRole},{FieldNames.AIContent},{FieldNames.AIFunction.ToLookupField()},{FieldNames.AIConversation.ToLookupField()},{FieldNames.AIArguments},{FieldNames.AITeamsId},{FieldNames.Title},{FieldNames.AIReference},{FieldNames.Created}";
 
     public SharePointMessageRepository(ILogger<SharePointMessageRepository> logger,
-    AppConfig config, IMapper mapper,
-    IGraphClientFactory graphClientFactory)
+    IGraphClientFactory graphClientFactory,
+    ChatGPTeamsContext context)  
     {
-        _siteId = config.SharePointSiteId;
         _logger = logger;
-        _mapper = mapper;
         _graphClientFactory = graphClientFactory;
+        _context = context;  
     }
 
     private Microsoft.Graph.GraphServiceClient GraphService
@@ -49,76 +43,44 @@ public class SharePointMessageRepository : ISharePointMessageRepository
 
     public async Task<IEnumerable<Message>> GetByConversation(string conversationId)
     {
-        var items = await GraphService.GetListItemsFromListAsync(_siteId, ListNames.AIMessages, $"fields/{FieldNames.AIConversation.ToLookupField()} eq {conversationId}", _selectQuery);
-
-        return _mapper.Map<IEnumerable<Message>>(items);
+        return await _context.Messages.Where(t => t.Conversation.Id == conversationId).OrderBy(a => a.Created).ToListAsync();
     }
 
-
-    public async Task<string> Create(Message message)
+    public async Task<int> Create(Message assistant)
     {
-        var newMessage = message.ToDictionary().ToListItem();
-
-        var createdMessage = await GraphService.Sites[_siteId].Lists[ListNames.AIMessages].Items
-            .Request()
-            .AddAsync(newMessage);
-
-        return createdMessage.Id;
+        await _context.Messages.AddAsync(assistant);
+        await _context.SaveChangesAsync();
+        return assistant.Id;
     }
 
-    public async Task Delete(string id)
+    public async Task Delete(int id)
     {
-        await GraphService.Sites[_siteId].Lists[ListNames.AIMessages].Items[id]
-         .Request()
-         .DeleteAsync();
+        var itemToDelete = await _context.Messages.FindAsync(id);
+        if (itemToDelete != null)
+        {
+            _context.Messages.Remove(itemToDelete);
+            await _context.SaveChangesAsync();
+        }
+        // Handle not found scenario as needed.
     }
+ 
 
     public async Task DeleteByConversationAndTeamsId(string conversationId, string teamsId)
     {
-        var item = await GetByConversationAndTeamsId(conversationId, teamsId);
-
-        if (item != null)
+        var itemToDelete = await _context.Messages.FirstOrDefaultAsync(a => a.Conversation.Id == conversationId && a.TeamsId == teamsId);
+        if (itemToDelete != null)
         {
-            await GraphService.Sites[_siteId].Lists[ListNames.AIMessages].Items[item.Id]
-             .Request()
-             .DeleteAsync();
+            _context.Messages.Remove(itemToDelete);
+            await _context.SaveChangesAsync();
         }
+
     }
 
     public async Task DeleteByConversationAndDateTime(string conversationId, DateTime date)
     {
-        var items = await GraphService.GetListItemsFromListAsync(_siteId,
-                                                                 ListNames.AIMessages,
-                                                                 $"fields/{FieldNames.Created} lt '{date:o}' and fields/{FieldNames.AIConversation.ToLookupField()} eq {conversationId}",
-                                                                 "Id");
-
-        foreach (var item in items)
-        {
-            await GraphService.Sites[_siteId].Lists[ListNames.AIMessages].Items[item.Id]
-             .Request()
-             .DeleteAsync();
-
-        }
-    }
-
-    public async Task<Message> GetByConversationAndTeamsId(string conversationId, string teamsId)
-    {
-        var item = await GraphService.GetFirstListItemFromListAsync(_siteId,
-                                                                    ListNames.AIMessages,
-                                                                    $"fields/{FieldNames.AITeamsId} eq '{teamsId}' and fields/{FieldNames.AIConversation.ToLookupField()} eq {conversationId}",
-                                                                    _selectQuery);
-
-        return item != null ? _mapper.Map<Message>(item) : null;
-    }
-
-    public async Task Update(Message message)
-    {
-
-        var messageToUpdate = message.ToDictionary().ToFieldValueSet();
-
-        await GraphService.Sites[_siteId].Lists[ListNames.AIMessages].Items[message.Id].Fields
-            .Request()
-            .UpdateAsync(messageToUpdate);
+        var items = await _context.Messages.Where(a => a.Conversation.Id == conversationId && a.Created < date).ToListAsync();
+        _context.Messages.RemoveRange(items);
+        await _context.SaveChangesAsync();
     }
 
 }

@@ -12,7 +12,7 @@ namespace achappey.ChatGPTeams.Services.Graph
     public partial class GraphFunctionsClient
     {
         // Sends an email on the users behalf using the Microsoft Graph API
-        [MethodDescription("Sends an email using the Microsoft Graph API")]
+        [MethodDescription("Mail|Sends an email using the Microsoft Graph API")]
         public async Task<Models.Response> SendMail([ParameterDescription("The email addresses to send the email to seperated by ;")] string toAddresses,
             [ParameterDescription("The email addresses to cc the email to seperated by ;")] string ccAddresses,
             [ParameterDescription("The subject of the email")] string subject,
@@ -85,7 +85,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return SuccessResponse();
         }
 
-        [MethodDescription("Replies an email using the Microsoft Graph API")]
+        [MethodDescription("Mail|Replies an email using the Microsoft Graph API")]
         public async Task<Models.Response> ReplyMail(
             [ParameterDescription("The ID of the e-mail.")] string id,
             [ParameterDescription("The email addresses to send the email to seperated by ;")] string toAddresses,
@@ -134,7 +134,7 @@ namespace achappey.ChatGPTeams.Services.Graph
 
         }
 
-        [MethodDescription("Searches the chat logs based on the provided member and chat type.")]
+        [MethodDescription("Teams|Searches the chat logs based on the provided member and chat type.")]
         public async Task<IEnumerable<Models.Graph.TeamsChat>> SearchChat(
             [ParameterDescription("The member to filter on.")] string member = null,
             [ParameterDescription("The type of chat to filter on.")] ChatType? chatType = null)
@@ -164,7 +164,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return items.Select(a => _mapper.Map<Models.Graph.TeamsChat>(a));
         }
 
-        [MethodDescription("Changes the password of the current user.")]
+        [MethodDescription("Users|Changes the password of the current user.")]
         public async Task<string> ChangeMyPassword(
             [ParameterDescription("The new password.")] string newPassword,
             [ParameterDescription("The current password.")] string currentPassword)
@@ -179,7 +179,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
         // Get information about the user.
-        [MethodDescription("Retrieves the profile of the current user.")]
+        [MethodDescription("Users|Retrieves the profile of the current user.")]
         public async Task<Models.Graph.User> MyProfile()
         {
             var graphClient = GetAuthenticatedClient();
@@ -189,7 +189,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
         // gets information about the user's manager.
-        [MethodDescription("Retrieves information about the current user's manager.")]
+        [MethodDescription("Users|Retrieves information about the current user's manager.")]
         public async Task<Models.Graph.User> MyManager()
         {
             var graphClient = GetAuthenticatedClient();
@@ -197,7 +197,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return _mapper.Map<Models.Graph.User>(manager);
         }
 
-        [MethodDescription("Gets mail for the user using the Microsoft Graph API")]
+        [MethodDescription("Mail|Gets mail for the user using the Microsoft Graph API")]
         public async Task<IEnumerable<Models.Graph.Email>> SearchMail(
             [ParameterDescription("Subject of the email to search for")] string subject = null,
             [ParameterDescription("Sender of the email to search for")] string from = null,
@@ -243,7 +243,7 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
         // Search for teams based on team name or description.
-        [MethodDescription("Searches for your teams based on name or description.")]
+        [MethodDescription("Teams|Searches for your teams based on name or description.")]
         public async Task<IEnumerable<Models.Graph.Team>> SearchMyTeams(
             [ParameterDescription("The team name to filter on.")] string name = null,
             [ParameterDescription("The description to filter on.")] string description = null)

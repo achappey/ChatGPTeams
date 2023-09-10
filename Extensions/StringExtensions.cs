@@ -1,13 +1,204 @@
 using System;
+using System.Globalization;
 using System.Linq;
 using System.Text.RegularExpressions;
 using System.Web;
+using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using System.Collections.Generic;
+using System.Reflection;
+using achappey.ChatGPTeams.Services.Simplicate;
+using System.Collections;
+using System.Runtime.Serialization;
 
 namespace achappey.ChatGPTeams.Extensions
 {
     public static class StringExtensions
     {
+
+
+
+        public static string GetEnumMemberAttributeValue<T>(T enumValue) where T : Enum
+        {
+            var type = typeof(T);
+            var memberInfos = type.GetMember(enumValue.ToString());
+            var enumMemberAttribute = memberInfos[0].GetCustomAttributes(typeof(EnumMemberAttribute), false).FirstOrDefault() as EnumMemberAttribute;
+
+            return enumMemberAttribute?.Value;
+        }
+
+        public static int PageSize = 10;
+
+        public static int CalculateTotalPages(this Metadata metadata)
+        {
+            if (metadata == null || PageSize <= 0) return 1;
+            return (int)Math.Ceiling((double)metadata.Count / PageSize);
+        }
+
+        public static string ToHtmlTableText<T>(this IEnumerable<T> items, string captionText)
+        {
+            string html = "<table>";
+
+            if (!string.IsNullOrEmpty(captionText))
+            {
+                html += $"<caption>{captionText}</caption>";
+            }
+
+            html += "<thead><tr>";
+            AddHeaders(typeof(T), ref html, "");
+            html += "</tr></thead>";
+
+            html += "<tbody>";
+            foreach (T item in items)
+            {
+                html += "<tr>";
+                AddValues(item, ref html, "");
+                html += "</tr>";
+            }
+            html += "</tbody></table>";
+
+            return html;
+        }
+
+        public static string ToHtmlTable<T>(this IEnumerable<T> items, string skipToken)
+        {
+            string captionText = string.IsNullOrEmpty(skipToken)
+                ? string.Empty
+                : $"More items are available. Use the skipToken parameter with the value {skipToken} in your next function call to retrieve the next page of results.";
+
+            return items.ToHtmlTableText(captionText);
+        }
+
+        public static string ToHtmlTable<T>(this IEnumerable<T> items, long currentPage, int totalPages, int totalItems)
+        {
+            string captionText = $"Current page: {currentPage}/{totalPages} (you are viewing page {currentPage} out of {totalPages} available pages) <br> Items per page: {PageSize} (each page displays up to {PageSize} items) <br> Total items: {totalItems} (there are {totalItems} items in the dataset)";
+
+            return items.ToHtmlTableText(captionText);
+        }
+
+
+
+        private static void AddHeaders(Type type, ref string html, string prefix)
+        {
+            foreach (PropertyInfo property in type.GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.DeclaringType?.Assembly == type.Assembly)
+                {
+                    if (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string) || property.PropertyType == typeof(DateTimeOffset) || property.PropertyType == typeof(DateTimeOffset?))
+                    {
+                        html += $"<th>{prefix}{property.Name}</th>";
+                    }
+                    else if (property.PropertyType.IsArray)
+                    {
+                        html += $"<th>{prefix}{property.Name}[]</th>";
+                    }
+                    else
+                    {
+                        AddHeaders(property.PropertyType, ref html, $"{prefix}{property.Name}:");
+                    }
+                }
+            }
+        }
+
+        private static void AddHeaders2(Type type, ref string html, string prefix)
+        {
+            foreach (PropertyInfo property in type.GetProperties())
+            {
+                if (property.PropertyType.IsPrimitive || property.PropertyType == typeof(string))
+                {
+                    html += $"<th>{prefix}{property.Name}</th>";
+                }
+                else if (property.PropertyType.IsArray)
+                {
+                    html += $"<th>{prefix}{property.Name}[]</th>";
+                }
+                else
+                {
+                    AddHeaders(property.PropertyType, ref html, $"{prefix}{property.Name}:");
+                }
+            }
+        }
+
+
+        private static void AddValues(object item, ref string html, string prefix)
+        {
+            foreach (PropertyInfo property in item.GetType().GetProperties(BindingFlags.Public | BindingFlags.Instance))
+            {
+                if (property.GetIndexParameters().Length == 0) // Voorkomt dat geïndexeerde eigenschappen worden geëvalueerd
+                {
+                    object value = property.GetValue(item);
+
+                    if (value == null)
+                    {
+                        html += "<td></td>";
+                    }
+                    else if (value.GetType().IsPrimitive || value is string || value is DateTime || value is DateTimeOffset)
+                    {
+                        html += $"<td>{value}</td>";
+                    }
+                    else if (value is IEnumerable enumerableValue && !(value is string))
+                    {
+                        html += "<td><table><thead><tr>";
+                        var enumerableType = value.GetType().GetGenericArguments().FirstOrDefault();
+                        if (enumerableType != null && enumerableValue.Cast<object>().Any())
+                        {
+                            AddHeaders(enumerableType, ref html, "");
+                        }
+                        html += "</tr></thead><tbody>";
+                        foreach (var arrItem in enumerableValue)
+                        {
+                            html += "<tr>";
+                            AddValues(arrItem, ref html, "");
+                            html += "</tr>";
+                        }
+                        html += "</tbody></table></td>";
+                    }
+                    else
+                    {
+                        AddValues(value, ref html, $"{prefix}{property.Name}:");
+                    }
+                }
+            }
+        }
+
+        private static void AddValues2(object item, ref string html, string prefix)
+        {
+            var dsadsa = item.GetType().GetProperties();
+            foreach (PropertyInfo property in item.GetType().GetProperties())
+            {
+                object value = property.GetValue(item);
+                if (value == null)
+                {
+                    html += "<td></td>";
+                }
+                else if (value.GetType().IsPrimitive || value is string)
+                {
+                    html += $"<td>{value}</td>";
+                }
+                else if (value is IEnumerable enumerableValue && !(value is string))
+                {
+                    html += "<td><table><thead><tr>";
+                    var enumerableType = value.GetType().GetGenericArguments().FirstOrDefault();
+                    if (enumerableType != null && enumerableValue.Cast<object>().Any())
+                    {
+                        AddHeaders(enumerableType, ref html, "");
+                    }
+                    html += "</tr></thead><tbody>";
+                    foreach (var arrItem in enumerableValue)
+                    {
+                        html += "<tr>";
+                        AddValues(arrItem, ref html, "");
+                        html += "</tr>";
+                    }
+                    html += "</tbody></table></td>";
+                }
+                else
+                {
+                    AddValues(value, ref html, $"{prefix}{property.Name}:");
+                }
+            }
+        }
+
         public static string ToChatHandle(this string input)
         {
             if (input == null)
@@ -94,10 +285,7 @@ namespace achappey.ChatGPTeams.Extensions
                 // Check if the parameter value is a JSON object
                 if (parameterValue.StartsWith("{"))  // %7B = {
                 {
-                    // URL-decode and parse as JSON
-                    //  var jsonStr = HttpUtility.UrlDecode(parameterValue);
                     var jsonObj = JObject.Parse(parameterValue);
-                    // Extract objectUrl from the JSON object
                     var urlValue = jsonObj["objectUrl"]?.ToString();
                     return urlValue;
                 }
@@ -112,6 +300,11 @@ namespace achappey.ChatGPTeams.Extensions
                 // Handle any exceptions that occur during parsing, if necessary
                 return null;
             }
+        }
+
+        public static T FromJson<T>(this string url)
+        {
+            return JsonConvert.DeserializeObject<T>(url);
         }
 
         public static string ExtractContentSource(this string url)
@@ -143,6 +336,22 @@ namespace achappey.ChatGPTeams.Extensions
         }
 
 
+        public static string GenerateNewAssistantTitle(this string title)
+        {
+            Random random = new Random();
+            int number = random.Next(0, 100000);  // upper bound is exclusive so we need to use 100000 to include 99999
+            return title + number.ToString("D5"); // "D5" formats the number as a decimal with 5 digits, padding with leading zeroes if necessary
+        }
+
+        public static void EnsureValidDateFormat(this string dateStr, string expectedFormat = "yyyy-MM-dd HH:mm:ss")
+        {
+            DateTime temp;
+            if (!string.IsNullOrEmpty(dateStr) && !DateTime.TryParseExact(dateStr, expectedFormat, CultureInfo.InvariantCulture, DateTimeStyles.None, out temp))
+            {
+
+                throw new Exception("Date format is not OK. Expected format: " + expectedFormat);
+            }
+        }
 
     }
 }

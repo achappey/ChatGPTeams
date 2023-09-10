@@ -15,6 +15,7 @@ public class AppConfig
     public string MicrosoftAppTenantId { get; set; } = null!;
     public string OpenAI { get; set; } = null!;
     public string ConnectionName { get; set; } = null!;
+    public string Database { get; set; } = null!;
     public string SharePointSiteId { get; set; } = null!;
 }
 

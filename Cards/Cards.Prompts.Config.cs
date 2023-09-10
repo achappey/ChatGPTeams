@@ -13,7 +13,7 @@ namespace achappey.ChatGPTeams.Cards
     {
         public static int PromptPageSize = 3;
 
-        public static Attachment CreatePromptInfoCard(IEnumerable<Prompt> prompts, string currentUser, int messageCount, int page = 0,
+        public static Attachment CreatePromptInfoCard(IEnumerable<Prompt> prompts, string currentUser, int page = 0,
                 string titleFilter = null,
                 string categoryFilter = null,
                 string ownerFilter = null,
@@ -72,7 +72,7 @@ namespace achappey.ChatGPTeams.Cards
 
             card.Actions.Add(new AdaptiveSubmitAction
             {
-                Title = $"{CardsConfigText.CleanHistoryText} ({messageCount})",
+                Title = $"{CardsConfigText.CleanHistoryText}",
                 Tooltip = "Wis de geschiedenis van je huidige conversatie",
                 Data = new
                 {

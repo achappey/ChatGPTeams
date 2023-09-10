@@ -3,12 +3,14 @@ using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Config.SharePoint;
+using achappey.ChatGPTeams.Database;
+using achappey.ChatGPTeams.Database.Models;
 using achappey.ChatGPTeams.Extensions;
-using achappey.ChatGPTeams.Models;
 using AutoMapper;
 using HtmlAgilityPack;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-using Microsoft.Graph;
+//using Microsoft.Graph;
 using Newtonsoft.Json;
 
 namespace achappey.ChatGPTeams.Repositories;
@@ -17,10 +19,10 @@ public interface IResourceRepository
 {
     Task<Resource> Get(string id);
     Task<IEnumerable<Resource>> GetByConversation(string conversationId);
-    Task<IEnumerable<Resource>> GetByAssistant(string assistantId);
-    Task<string> Create(Resource resource);
+    // Task<IEnumerable<Resource>> GetByAssistant(int assistantId);
+    Task<int> Create(Resource resource);
     Task<IEnumerable<string>> Read(Resource resource);
-    Task Delete(string id);
+    Task Delete(int id);
     Task<string> GetFileName(Resource resource);
     Task Update(Resource resource);
 }
@@ -32,21 +34,23 @@ public class ResourceRepository : IResourceRepository
     private readonly IMapper _mapper;
     private readonly IGraphClientFactory _graphClientFactory;
     private readonly IHttpClientFactory _httpClientFactory;
+    private readonly ChatGPTeamsContext _context;
 
     private readonly string _selectQuery = $"{FieldNames.Title},{FieldNames.AIAssistant},{FieldNames.AIAssistant.ToLookupField()},{FieldNames.AIConversation.ToLookupField()},{FieldNames.AIContentUrl}";
 
-    public ResourceRepository(ILogger<ResourceRepository> logger,
+    public ResourceRepository(ILogger<ResourceRepository> logger, ChatGPTeamsContext chatGPTeamsContext,
     AppConfig config, IMapper mapper, IHttpClientFactory httpClientFactory,
     IGraphClientFactory graphClientFactory)
     {
         _logger = logger;
         _mapper = mapper;
         _siteId = config.SharePointSiteId;
+        _context = chatGPTeamsContext;
         _httpClientFactory = httpClientFactory;
         _graphClientFactory = graphClientFactory;
     }
 
-    private GraphServiceClient GraphService
+    private Microsoft.Graph.GraphServiceClient GraphService
     {
         get
         {
@@ -54,32 +58,26 @@ public class ResourceRepository : IResourceRepository
         }
     }
 
+    /*  public async Task<Resource> Get2(string id)
+      {
+          var item = await GraphService.GetListItemFromListAsync(_siteId, ListNames.AIResources, id, _selectQuery);
+
+          return _mapper.Map<Resource>(item);
+      }*/
+
     public async Task<Resource> Get(string id)
     {
-        var item = await GraphService.GetListItemFromListAsync(_siteId, ListNames.AIResources, id, _selectQuery);
-
+        var item = await _context.Resources.FindAsync(id);
         return _mapper.Map<Resource>(item);
     }
 
     public async Task<IEnumerable<Resource>> GetByConversation(string conversationId)
     {
-        var items = await GraphService.GetListItemsFromListAsync(_siteId,
-        ListNames.AIResources,
-        $"fields/{FieldNames.AIConversation.ToLookupField()} eq {conversationId.ToInt()}",
-        _selectQuery);
+        return await _context.Resources.Where(t => t.Conversations.Any(y => y.Id == conversationId)
+        || t.Assistants.Any(z => z.Conversations.Any(n => n.Id == conversationId))).ToListAsync();
 
-        return _mapper.Map<IEnumerable<Resource>>(items);
     }
 
-    public async Task<IEnumerable<Resource>> GetByAssistant(string assistantId)
-    {
-        var items = await GraphService.GetListItemsFromListAsync(_siteId,
-        ListNames.AIResources,
-        $"fields/{FieldNames.AIAssistant.ToLookupField()} eq {assistantId.ToInt()}",
-        _selectQuery);
-
-        return _mapper.Map<IEnumerable<Resource>>(items);
-    }
 
     public async Task<string> GetFileName(Resource resource)
     {
@@ -91,7 +89,7 @@ public class ResourceRepository : IResourceRepository
                 return driveItem.Name;
 
             }
-            catch (ServiceException e)
+            catch (Microsoft.Graph.ServiceException e)
             {
                 if (e.Error.Message == "Site Pages cannot be accessed as a drive item")
                 {
@@ -170,7 +168,7 @@ public class ResourceRepository : IResourceRepository
                 return lines;
 
             }
-            catch (ServiceException e)
+            catch (Microsoft.Graph.ServiceException e)
             {
                 if (e.Error.Message == "Site Pages cannot be accessed as a drive item")
                 {
@@ -190,42 +188,44 @@ public class ResourceRepository : IResourceRepository
         }
     }
 
-    public async Task<string> Create(Resource resource)
+
+    public async Task<int> Create(Resource resource)
     {
-        var newResource = new Dictionary<string, object>()
+
+        try
         {
-            {FieldNames.Title, resource.Name},
-            {FieldNames.AIConversation.ToLookupField(), resource.Conversation.Id.ToInt()},
-            {FieldNames.AIContentUrl,resource.Url},
-        }.ToListItem();
-
-        var createdResource = await GraphService.Sites[_siteId].Lists[ListNames.AIResources].Items
-            .Request()
-            .AddAsync(newResource);
-
-        return createdResource.Id;
+            await _context.Resources.AddAsync(resource);
+            await _context.SaveChangesAsync();
+            return resource.Id;
+        }
+        catch (DbUpdateException ex)
+        {
+            // Log the detailed error
+            _logger.LogError(ex.InnerException?.Message ?? ex.Message);
+            throw;
+        }
     }
 
     public async Task Update(Resource resource)
     {
-        var updateResource = new Dictionary<string, object>()
+        var existingResource = await _context.Resources.FindAsync(resource.Id);
+        if (existingResource != null)
         {
-            {FieldNames.Title, resource.Name},
-            {FieldNames.AIConversation.ToLookupField(), resource.Conversation?.Id.ToInt()},
-            {FieldNames.AIAssistant.ToLookupField(), resource.Assistant?.Id.ToInt()},
-            {FieldNames.AIContentUrl, resource.Url},
-        }.ToFieldValueSet();
-
-        await GraphService.Sites[_siteId].Lists[ListNames.AIResources].Items[resource.Id].Fields
-            .Request()
-            .UpdateAsync(updateResource);
+            _mapper.Map(resource, existingResource);
+            _context.Resources.Update(existingResource);
+            await _context.SaveChangesAsync();
+        }
+        // Handle not found scenario as needed.
     }
 
-    public async Task Delete(string id)
+    public async Task Delete(int id)
     {
-        await GraphService.Sites[_siteId].Lists[ListNames.AIResources].Items[id]
-         .Request()
-         .DeleteAsync();
+        var resourceToDelete = await _context.Resources.FindAsync(id);
+        if (resourceToDelete != null)
+        {
+            _context.Resources.Remove(resourceToDelete);
+            await _context.SaveChangesAsync();
+        }
     }
 
     private List<string> ExtractTextFromHtmlParagraphs(HtmlDocument htmlDoc)

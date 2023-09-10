@@ -48,6 +48,7 @@ namespace achappey.ChatGPTeams.Extensions
 
     public static async Task<ListItem> GetFirstListItemFromListAsync(this GraphServiceClient _graphService, string siteId, string title, string query, string select = null)
     {
+
       var items = await _graphService.GetListItemsFromListAsync(siteId, title, query, select);
 
       return items.FirstOrDefault();
@@ -56,4 +57,5 @@ namespace achappey.ChatGPTeams.Extensions
 
   }
 }
+
 

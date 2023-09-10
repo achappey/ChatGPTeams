@@ -5,6 +5,7 @@ using System.Linq;
 using achappey.ChatGPTeams.Repositories;
 using Microsoft.Extensions.Caching.Memory;
 using System;
+using AutoMapper;
 
 namespace achappey.ChatGPTeams.Services;
 
@@ -20,58 +21,54 @@ public class ChatService : IChatService
     private readonly IChatRepository _chatRepository;
     private readonly IEmbeddingRepository _embeddingRepository;
     private readonly IMessageService _messageService;
-    private readonly IConversationRepository _conversationRepository;
-    private readonly IAssistantRepository _assistantRepository;
+    private readonly IConversationService _conversationService;
     private readonly IResourceRepository _resourceRepository;
     private readonly IFunctionDefinitonRepository _functionDefinitonRepository;
     private readonly IMemoryCache _cache;
+    private readonly IMapper _mapper;
 
     public ChatService(IChatRepository chatRepository, IEmbeddingRepository embeddingRepository, IMemoryCache cache,
-    IAssistantRepository assistantRepository,
-    IMessageService messageService, IConversationRepository conversationRepository,
+    IMapper mapper,
+    IMessageService messageService, IConversationService conversationService,
     IFunctionDefinitonRepository functionDefinitonRepository, IResourceRepository resourceService)
     {
         _chatRepository = chatRepository;
         _embeddingRepository = embeddingRepository;
         _messageService = messageService;
         _resourceRepository = resourceService;
-        _conversationRepository = conversationRepository;
+        _mapper = mapper;
+        _conversationService = conversationService;
         _functionDefinitonRepository = functionDefinitonRepository;
-        _assistantRepository = assistantRepository;
         _cache = cache;
 
     }
 
     public async Task<Conversation> GetChatConversation(ConversationContext context)
     {
-        var conversation = await _conversationRepository.GetByTitle(context.Id);
-        conversation.Assistant = await _assistantRepository.Get(conversation.Assistant.Id);
-        conversation.Assistant.Prompt += $"Current date/time:{DateTime.Now.ToLocalTime()}";
-        conversation.Assistant.Resources = await _resourceRepository.GetByAssistant(conversation.Assistant.Id);
-        conversation.FunctionDefinitions = await _functionDefinitonRepository.GetByNames(conversation.AllFunctionNames);
+        var conversation = await _conversationService.GetConversationAsync(context.Id);
+
+     //   TimeZoneInfo localTimeZoneInfo = TimeZoneInfo.FindSystemTimeZoneById(context.LocalTimezone);
+      //  DateTime localTime = TimeZoneInfo.ConvertTimeFromUtc(DateTime.UtcNow, localTimeZoneInfo);
+        string formattedTime = DateTime.UtcNow.ToString("yyyy-MM-dd HH:mm:ss");
+        conversation.Assistant.Prompt += $"Current date/time: {formattedTime}. Current timezone: {context.LocalTimezone}";// Current timezone: {context.LocalTimezone}
+
+        var functions = await _functionDefinitonRepository.GetByNames(conversation.AllFunctionNames);
+        conversation.FunctionDefinitions = functions.Select(t => t.FunctionDefinition);
         conversation.Messages = (await _messageService.GetByConversationAsync(context, conversation.Id)).ToList();
-        conversation.Resources = await _resourceRepository.GetByConversation(conversation.Id);
 
         return conversation;
     }
 
-    public async IAsyncEnumerable<Message> SendRequestStream(Conversation conversation)
+    public IAsyncEnumerable<Message> SendRequestStream(Conversation conversation)
     {
         if (conversation.AllResources.Count() > 0)
         {
-            await foreach (var message in ChatWithEmbeddingsStream(conversation))
-            {
-                message.Reference = conversation.Messages.Last().Reference;
-                yield return message;
-            }
+            return ChatWithEmbeddingsStream(conversation);
+
         }
         else
         {
-            await foreach (var message in _chatRepository.ChatStreamAsync(conversation))
-            {
-                message.Reference = conversation.Messages.Last().Reference;
-                yield return message;
-            }
+            return _chatRepository.ChatStreamAsync(conversation);
         }
     }
 
@@ -88,7 +85,7 @@ public class ChatService : IChatService
             if (!_cache.TryGetValue(cacheKey, out Tuple<IEnumerable<string>, IEnumerable<byte[]>> cacheEntry))
             {
                 // Calculate lines and embeddings if they aren't in the cache
-                var lines = await _resourceRepository.Read(resource);
+                var lines = await _resourceRepository.Read(_mapper.Map<Database.Models.Resource>(resource));
 
                 if (lines != null && lines.Count() > 0)
                 {

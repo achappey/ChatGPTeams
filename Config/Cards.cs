@@ -37,6 +37,7 @@ public static class CardsConfigText
     public const string ChooseYourChatOptionsText = "Kies je functies";
     public const string ChooseYourDataSourcesText = "Beheer je chatbronnen";
     public const string ViewResultText = "Resultaat bekijken";
+    public const string ViewInputText = "Invoer bekijken";
     public const string DialogHeaderText = "Standaard dialoog";
     public const string NextPageText = ">";
     public const string PrevPageText = "<";

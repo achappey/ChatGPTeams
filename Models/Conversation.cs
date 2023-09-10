@@ -2,6 +2,7 @@
 
 using System;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations.Schema;
 using System.Linq;
 using OpenAI.ObjectModels.RequestModels;
 
@@ -57,12 +58,12 @@ namespace achappey.ChatGPTeams.Models
 
                 if (Functions != null)
                 {
-                    functionNames.AddRange(Functions.Select(y => y.Name));
+                    functionNames.AddRange(Functions.Select(y => y.Id));
                 }
 
                 if (Assistant?.Functions != null)
                 {
-                    functionNames.AddRange(Assistant.Functions.Select(y => y.Name));
+                    functionNames.AddRange(Assistant.Functions.Select(y => y.Id));
                 }
 
                 return functionNames.Distinct();
@@ -77,6 +78,9 @@ namespace achappey.ChatGPTeams.Models
         public string? TeamsId { get; set; }
 
         public string? MessageId { get; set; }
+        
+        public string? LocalTimezone { get; set; }
+
         public string? UserDisplayName { get; set; }
 
         public string? ChannelId { get; set; }

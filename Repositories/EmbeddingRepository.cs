@@ -36,8 +36,104 @@ public class EmbeddingRepository : IEmbeddingRepository
     {
         return await CalculateEmbeddingAsync(input);
     }
-
+    
     public async Task<IEnumerable<byte[]>> GetEmbeddingsFromLinesAsync(IEnumerable<string> lines)
+    {
+        const int maxTokenSize = 8191;
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
+        var files = new List<byte[]>();
+        var currentBatch = new List<string>();
+        int currentTokenSize = 0;
+
+        foreach (var line in lines)
+        {
+            int lineTokenSize = encoding.Encode(line).Count();
+
+            // Controleer of de enkele regel te groot is
+            if (lineTokenSize > maxTokenSize)
+            {
+                // Splits de regel op
+                var subLines = SplitLineToFit(line, encoding, maxTokenSize);
+                foreach (var subLine in subLines)
+                {
+                    currentTokenSize = await AddLineToBatch(subLine, encoding, currentBatch, files, currentTokenSize, maxTokenSize);
+                }
+            }
+            else
+            {
+                currentTokenSize = await AddLineToBatch(line, encoding, currentBatch, files, currentTokenSize, maxTokenSize);
+            }
+        }
+
+        // Verwerk eventuele overgebleven regels in de huidige batch
+        if (currentBatch.Any())
+        {
+            byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
+            files.Add(embeddings);
+        }
+
+        return files;
+    }
+
+    private async Task<int> AddLineToBatch(string line, GptEncoding encoding, List<string> currentBatch, List<byte[]> files, int currentTokenSize, int maxTokenSize)
+    {
+        int lineTokenSize = encoding.Encode(line).Count();
+
+        if (currentTokenSize + lineTokenSize > maxTokenSize)
+        {
+            // Verwerk de huidige batch
+            byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
+            files.Add(embeddings);
+
+            // Start een nieuwe batch
+            currentBatch.Clear();
+            currentTokenSize = 0;
+        }
+
+        currentBatch.Add(line);
+        currentTokenSize += lineTokenSize;
+
+        return currentTokenSize;
+    }
+
+    private List<string> SplitLineToFit(string line, GptEncoding encoding, int maxTokenSize)
+    {
+        List<string> subLines = new List<string>();
+        StringBuilder currentSubLine = new StringBuilder();
+        int currentTokenCount = 0;
+
+        // Doorloop elk woord in de regel
+        foreach (var word in line.Split(' '))
+        {
+            int wordTokenCount = encoding.Encode(word).Count();
+
+            // Als het toevoegen van het nieuwe woord de maximale grootte zou overschrijden
+            if (currentTokenCount + wordTokenCount + 1 > maxTokenSize) // +1 voor de spatie
+            {
+                // Voeg de huidige subregel toe aan de lijst
+                subLines.Add(currentSubLine.ToString().Trim());
+
+                // Reset voor de nieuwe subregel
+                currentSubLine.Clear();
+                currentTokenCount = 0;
+            }
+
+            // Voeg het woord toe aan de huidige subregel
+            currentSubLine.Append(word + " ");
+            currentTokenCount += wordTokenCount + 1; // +1 voor de spatie
+        }
+
+        // Voeg eventuele resterende tekst toe
+        if (currentSubLine.Length > 0)
+        {
+            subLines.Add(currentSubLine.ToString().Trim());
+        }
+
+        return subLines;
+    }
+
+
+    public async Task<IEnumerable<byte[]>> GetEmbeddingsFromLinesAsync2(IEnumerable<string> lines)
     {
         const int maxTokenSize = 8191;
         var encoding = GptEncoding.GetEncoding("cl100k_base");

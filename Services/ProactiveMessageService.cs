@@ -32,7 +32,6 @@ public interface IProactiveMessageService
         string titleFilter,
         string categoryFilter,
         string ownerFilter,
-        int messageCount,
         Visibility? visibilityFilter,
         CancellationToken cancellationToken);
 
@@ -86,7 +85,7 @@ public interface IProactiveMessageService
        CancellationToken cancellationToken);
 
     Task EditPromptAsync(ConversationReference conversationReference, Prompt prompt, IEnumerable<Assistant> assistants,
-            IEnumerable<Function> functions,  IEnumerable<string> categories, string replyToId, CancellationToken cancellationToken);
+            IEnumerable<Function> functions, IEnumerable<string> categories, string replyToId, CancellationToken cancellationToken);
     Task ShowMenuAsync(ConversationReference conversationReference,
         string appName,
         string assistantName,
@@ -121,24 +120,20 @@ public class ProactiveMessageService : IProactiveMessageService
         return activityId;
     }
 
-     public async Task<string> UpdateMessageAsync(ConversationReference conversationReference, string message, string replyId, CancellationToken cancellationToken)
+    public async Task<string> UpdateMessageAsync(ConversationReference conversationReference, string message, string replyId, CancellationToken cancellationToken)
     {
         string activityId = null;
 
         await _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
         {
             var activityToUpdate = new Activity()
-        {
-            Id = replyId,
-            Type = ActivityTypes.Message,
-            Text = message
-        };
+            {
+                Id = replyId,
+                Type = ActivityTypes.Message,
+                Text = message
+            };
 
-        await turnContext.UpdateActivityAsync(activityToUpdate, cancellationToken);
-
-         //   var response = await turnContext.SendActivityAsync(message);
-          //  response.Id = replyId;
-            //activityId = response.Id;
+            await turnContext.UpdateActivityAsync(activityToUpdate, cancellationToken);
         }, cancellationToken);
 
         return activityId;
@@ -188,7 +183,7 @@ public class ProactiveMessageService : IProactiveMessageService
     {
         await _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
                {
-                   var card = MessageFactory.Attachment(ChatCards.CreateFunctionExecutedCard(function.Title, result));
+                   var card = MessageFactory.Attachment(ChatCards.CreateFunctionExecutedCard(function.Title, result, functionCall.Arguments));
                    card.Id = replyId;
 
                    await turnContext.UpdateActivityAsync(card, cancellationToken);
@@ -275,13 +270,13 @@ public class ProactiveMessageService : IProactiveMessageService
             var card = MessageFactory.Attachment(ChatCards.CreateRoleInfoCard(currentConversation.Assistant.Name,
             currentConversation.Assistant.Prompt,
             currentConversation.Temperature,
-            currentConversation.Assistant.Model,
+            currentConversation.Assistant.Model.Name,
             currentConversation.Assistant.Visibility,
             currentConversation.Assistant.Functions,
-            currentConversation.Assistant.Owners.Select(a => a.DisplayName),
+            new List<string>() { currentConversation.Assistant.Owner.DisplayName },
             allAssistants.Select(a => a.Name).ToArray(),
             allFunctions,
-            currentConversation.Assistant.Owners.Any(a => a.DisplayName == turnContext.Activity.From.Name)));
+            currentConversation.Assistant.Owner.Id == turnContext.Activity.From.AadObjectId));
 
             if (!string.IsNullOrEmpty(replyToId))
             {
@@ -356,13 +351,12 @@ public class ProactiveMessageService : IProactiveMessageService
         string titleFilter,
         string categoryFilter,
         string ownerFilter,
-        int messageCount,
         Visibility? visibilityFilter,
        CancellationToken cancellationToken)
     {
         return _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
         {
-            var card = MessageFactory.Attachment(ChatCards.CreatePromptInfoCard(prompts, currentUser, messageCount, page, titleFilter, categoryFilter, ownerFilter, visibilityFilter));
+            var card = MessageFactory.Attachment(ChatCards.CreatePromptInfoCard(prompts, currentUser, page, titleFilter, categoryFilter, ownerFilter, visibilityFilter));
             if (!string.IsNullOrEmpty(replyToId))
             {
                 card.Id = replyToId;
@@ -392,9 +386,6 @@ public class ProactiveMessageService : IProactiveMessageService
             {
                 await turnContext.SendActivityAsync(card, cancellationToken);
             }
-
-            //await turnContext.SendActivityAsync(card, cancellationToken);
-
         }, cancellationToken);
     }
 }

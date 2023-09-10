@@ -24,7 +24,7 @@ namespace achappey.ChatGPTeams.Extensions
     public static class FileExtensions
     {
 
-        public static List<string> ConvertPdfToLines(this byte[] pdfBytes, int maxWordsPerLine = 250)
+        public static List<string> ConvertPdfToLines(this byte[] pdfBytes, int maxWordsPerLine = 1000)
         {
             using var stream = new MemoryStream(pdfBytes);
             using var pdfReader = new PdfReader(stream);
@@ -172,6 +172,22 @@ namespace achappey.ChatGPTeams.Extensions
             }
         }
 
+        public static List<string> ConvertHtmlToList(this byte[] bytes)
+        {
+            using (var memoryStream = new MemoryStream(bytes))
+            {
+                using (var streamReader = new StreamReader(memoryStream, Encoding.UTF8))
+                {
+                    string htmlContent = streamReader.ReadToEnd();
+
+                    var htmlDocument = new HtmlDocument();
+                    htmlDocument.LoadHtml(htmlContent);
+
+                    return htmlDocument.ExtractTextFromHtmlParagraphs();
+                }
+            }
+        }
+
         public static List<Tuple<byte[], string, DateTime?>> ExtractAttachments(this byte[] msgBytes)
         {
             using var stream = new MemoryStream(msgBytes);
@@ -228,7 +244,6 @@ namespace achappey.ChatGPTeams.Extensions
             return paragraphs;
         }
 
-
         public static List<string> ExtractTextFromHtmlParagraphs(this HtmlDocument htmlDoc)
         {
             var paragraphs = htmlDoc.DocumentNode.SelectNodes("//p");
@@ -238,20 +253,18 @@ namespace achappey.ChatGPTeams.Extensions
             {
                 foreach (var paragraph in paragraphs)
                 {
-                    if (paragraph.InnerText is not null)
-                    {
-                        var text = paragraph.InnerText.Trim();
+                    var htmlContent = paragraph.InnerHtml.Trim();  // Voor de inhoud binnen <p> tags
 
-                        if (!string.IsNullOrEmpty(text))
-                        {
-                            pageParagraphs.Add(text);
-                        }
+                    if (!string.IsNullOrEmpty(htmlContent))
+                    {
+                        pageParagraphs.Add(htmlContent);
                     }
                 }
             }
 
             return pageParagraphs;
         }
+
 
         public static async Task<List<string>> ConvertPageToList(this HttpClient httpClient, string url)
         {

@@ -11,7 +11,6 @@ using Microsoft.Bot.Builder;
 using Microsoft.Bot.Builder.Teams;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using OpenAI.ObjectModels.RequestModels;
 
 namespace achappey.ChatGPTeams.Extensions
 {
@@ -107,6 +106,8 @@ namespace achappey.ChatGPTeams.Extensions
                     return data.ConvertCsvToList();
                 case ".pptx":
                     return data.ConvertPptxToLines();
+                case ".html":
+                    return data.ConvertHtmlToList();
                 case ".txt":
                     return data.ConvertTxtToList();
                 default:
@@ -136,36 +137,29 @@ namespace achappey.ChatGPTeams.Extensions
 
         public static async Task<ConversationContext> ToConversationContext(this ITurnContext turnContext)
         {
-            switch (turnContext.Activity.Conversation.ConversationType)
+            var conversationContext = new ConversationContext()
             {
-                case "channel":
-                    var (ChannelId, MessageId) = turnContext.Activity.Conversation.Id.ExtractIds();
-                    var teamsInfo = await TeamsInfo.GetTeamDetailsAsync(turnContext);
+                Id = turnContext.Activity.Conversation.Id,
+                LocalTimezone = turnContext.Activity.LocalTimezone,
+                UserDisplayName = turnContext.Activity.From.Name,
+                ChatType = turnContext.Activity.Conversation.ConversationType.ToChatType(),
+                ReplyToId = turnContext.Activity.ReplyToId,
+                MessageId = turnContext.Activity.Id
+            };
 
-                    return new ConversationContext()
-                    {
-                        Id = turnContext.Activity.Conversation.Id,
-                        TeamsId = teamsInfo.AadGroupId,
-                        ChannelId = ChannelId,
-                        MessageId = MessageId,
-                        UserDisplayName = turnContext.Activity.From.Name,
-                        ChatType = turnContext.Activity.Conversation.ConversationType.ToChatType(),
-                        ReplyToId = turnContext.Activity.ReplyToId
-                    };
+            if (turnContext.Activity.Conversation.ConversationType == "channel")
+            {
+                var (ChannelId, MessageId) = turnContext.Activity.Conversation.Id.ExtractIds();
+                var teamsInfo = await TeamsInfo.GetTeamDetailsAsync(turnContext);
 
-                default:
-
-                    return new ConversationContext()
-                    {
-                        Id = turnContext.Activity.Conversation.Id,
-                        ReplyToId = turnContext.Activity.ReplyToId,
-                        MessageId = turnContext.Activity.Id,
-                        UserDisplayName = turnContext.Activity.From.Name,
-                        ChatType = turnContext.Activity.Conversation.ConversationType.ToChatType(),
-
-                    };
+                conversationContext.TeamsId = teamsInfo.AadGroupId;
+                conversationContext.ChannelId = ChannelId;
+                conversationContext.MessageId = MessageId;
             }
+
+            return conversationContext;
         }
+
 
         public static ChatType ToChatType(this string type)
         {
@@ -241,21 +235,6 @@ namespace achappey.ChatGPTeams.Extensions
             throw new Exception("Unknown visibility");
         }
 
-        public static string ToValue(this Visibility type)
-        {
-            switch (type)
-            {
-                case Visibility.Owner:
-                    return "Owner";
-                case Visibility.Department:
-                    return "Department";
-                case Visibility.Everyone:
-                    return "Everyone";
-            }
-
-            throw new Exception("Unknown visibility");
-        }
-
         public static string ExtractHref(this string str)
         {
             if (string.IsNullOrEmpty(str))
@@ -292,61 +271,12 @@ namespace achappey.ChatGPTeams.Extensions
             return resultValue;
         }
 
-        public static string GenerateNewAssistantTitle(this string title)
-        {
-            Random random = new Random();
-            int number = random.Next(0, 100000);  // upper bound is exclusive so we need to use 100000 to include 99999
-            return title + number.ToString("D5"); // "D5" formats the number as a decimal with 5 digits, padding with leading zeroes if necessary
-        }
 
         public static OpenAI.ObjectModels.RequestModels.ChatMessage ToChatMessage(this Assistant assistant)
         {
             return new OpenAI.ObjectModels.RequestModels.ChatMessage("system", assistant.Prompt);
         }
 
-        public static void ShortenChatHistory(this Conversation chat, int size = 1, int maxToKeep = 0)
-        {
-            List<Message> messages = chat.Messages.ToList();
-
-            int startIndex = messages[0].Role == Role.system ? 1 : 0;
-            int toRemove = 0;
-            for (int i = startIndex; i < messages.Count && toRemove < size; i++)
-            {
-                if (messages.Count - toRemove - 1 < maxToKeep)
-                {
-                    break;  // Don't remove any more messages if we'd fall below the maximum to keep
-                }
-
-                if (messages[i].Role == Role.assistant)
-                {
-                    toRemove++;
-                }
-                toRemove++;
-            }
-
-            if (toRemove > 0)
-            {
-                chat.Messages = messages.Skip(toRemove).ToList();
-            }
-            else
-            {
-                throw new InvalidOperationException("The chat history is empty or could not be shortened further.");
-            }
-        }
-
-        public static Dictionary<string, object> ToDictionary(this Message message)
-        {
-            return new Dictionary<string, object>()
-        {
-             {FieldNames.AIRole, message.Role.ToString()},
-                {FieldNames.AITeamsId, message.TeamsId},
-                {FieldNames.AIContent, message.Content},
-                {FieldNames.AIReference, JsonConvert.SerializeObject(message.Reference)},
-                {FieldNames.Title, message.Name},
-                {FieldNames.AIArguments, message.FunctionCall?.Arguments},
-                {FieldNames.AIConversation.ToLookupField(), int.Parse(message.ConversationId)}
-        };
-        }
 
 
     }

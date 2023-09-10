@@ -6,6 +6,8 @@ using achappey.ChatGPTeams.Models;
 using System.Linq;
 using Microsoft.Bot.Schema;
 using System.Text;
+using System;
+using System.Text.RegularExpressions;
 
 namespace achappey.ChatGPTeams.Services;
 
@@ -25,11 +27,11 @@ public interface IChatGPTeamsBotChatService
                                  ConversationReference reference,
                                  IEnumerable<Attachment> attachments,
                                  CancellationToken cancellationToken);
-    Task EnsureConversationByReferenceAsync(ConversationReference reference);
+    Task EnsureConversationAsync(ConversationContext context);
     Task DeleteConversationByReferenceAsync(ConversationReference reference);
-
-    Task ExecuteCustomPrompt(ConversationContext context, ConversationReference reference, string promptId, Message message, string user, string replyToId,
-          CancellationToken cancellationToken);
+    Task ExecuteCustomPrompt(ConversationContext context, ConversationReference reference, int promptId,
+            Message message, string user, string replyToId,
+            bool keepContext, CancellationToken cancellationToken);
 
 
 }
@@ -83,7 +85,7 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
             executionCardId = await _proactiveMessageService.ExecuteFunctionAsync(reference, function, functionCall, cancellationToken); // Execute function
         }
 
-        var result = await _functionExecutionService.ExecuteFunction(reference, functionCall);
+        var result = await _functionExecutionService.ExecuteFunction(context, reference, functionCall);
 
         if (executionCardId != null && result != null)
         {
@@ -110,6 +112,7 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         bool isFirstMessage = true;
         string messageId = null;
         StringBuilder accumulatedContent = new StringBuilder();
+
         Message completeMessage = null;
         var conversation = await _chatService.GetChatConversation(context);
         int accumulatedMessageCount = 0;
@@ -121,17 +124,14 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
                 accumulatedContent.Append(message.Content);
                 accumulatedMessageCount++;
 
-                // If message content is not empty, send proactive message
                 if (isFirstMessage)
                 {
-                    // Logic to update the card goes here. For example:
                     message.TeamsId = await _proactiveMessageService.SendMessageAsync(reference, accumulatedContent.ToString(), cancellationToken);
                     messageId = message.TeamsId;
                     isFirstMessage = false; // Reset flag
                 }
-                else if (accumulatedMessageCount >= 20)
+                else if (accumulatedMessageCount >= 25)
                 {
-                    // Update the message if we've accumulated 20 or more
                     message.TeamsId = await _proactiveMessageService.UpdateMessageAsync(reference, accumulatedContent.ToString(), messageId, cancellationToken);
                     accumulatedMessageCount = 0;  // Reset the accumulated message count
                 }
@@ -159,6 +159,7 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         {
             completeMessage.Content = accumulatedContent.ToString();
             completeMessage.Reference = reference;
+            completeMessage.Created = DateTimeOffset.Now;
             completeMessage.ConversationId = reference.Conversation.Id;
             completeMessage.Role = Role.assistant;
 
@@ -197,9 +198,9 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         return await _promptService.GetMyPromptsAsync();
     }
 
-    public async Task EnsureConversationByReferenceAsync(ConversationReference reference)
+    public async Task EnsureConversationAsync(ConversationContext context)
     {
-        await _conversationService.EnsureConversationByReferenceAsync(reference);
+        await _conversationService.EnsureConversationAsync(context.Id, context.TeamsId, context.ChannelId);
     }
 
     public async Task DeleteConversationByReferenceAsync(ConversationReference reference)
@@ -216,28 +217,27 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         await _messageService.DeleteByConversationAndTeamsId(reference.Conversation.Id, teamsId);
     }
 
-
-    public async Task ExecuteCustomPrompt(ConversationContext context, ConversationReference reference, string promptId, Message message, string user, string replyToId,
+    public async Task ExecuteCustomPrompt(ConversationContext context, ConversationReference reference,
+    int promptId, Message message, string user, string replyToId, bool keepContext,
           CancellationToken cancellationToken)
     {
         var prompt = await _promptService.GetPromptAsync(promptId);
         await _proactiveMessageService.ExecuteCustomPromptAsync(reference, message.Content, prompt.Title, replyToId, user, cancellationToken);
 
-
         var currentConversation = await _conversationService.GetConversationByContextAsync(context);
 
         if (prompt.Assistant != null)
         {
-            await _conversationService.ChangeConversationAssistantAsync(context, prompt.Assistant.Id);
+            await _conversationService.ChangeConversationAssistantAsync(context, prompt.Assistant.Name);
         }
 
         if (prompt.Functions != null)
         {
             foreach (var function in prompt.Functions)
             {
-                if (!currentConversation.AllFunctionNames.Any(t => t == function.Name))
+                if (!currentConversation.AllFunctionNames.Any(t => t == function.Id))
                 {
-                    await _functionService.AddFunctionToConversationAsync(reference, function.Name);
+                    await _functionService.AddFunctionToConversationAsync(reference, function.Id);
                 }
             }
         }
@@ -249,21 +249,25 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
 
         await ProcessMessageAsync(context, message, cancellationToken);
 
-        if (prompt.Assistant != null)
+        if (!keepContext)
         {
-            await _conversationService.ChangeConversationAssistantAsync(context, currentConversation.Assistant.Id);
-        }
-
-        if (prompt.Functions != null)
-        {
-            foreach (var function in prompt.Functions)
+            if (prompt.Assistant != null)
             {
-                if (!currentConversation.AllFunctionNames.Any(t => t == function.Name))
-                {
-                    await _functionService.DeleteFunctionFromConversationAsync(reference, function.Name);
-                }
-
+                await _conversationService.ChangeConversationAssistantAsync(context, currentConversation.Assistant.Name);
             }
+
+            if (prompt.Functions != null)
+            {
+                foreach (var function in prompt.Functions)
+                {
+                    if (!currentConversation.AllFunctionNames.Any(t => t == function.Id))
+                    {
+                        await _functionService.DeleteFunctionFromConversationAsync(reference, function.Id);
+                    }
+
+                }
+            }
+
         }
 
     }

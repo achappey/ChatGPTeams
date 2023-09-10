@@ -57,18 +57,18 @@ public interface IChatGPTeamsBotConfigService
         string title, string prompt, Visibility visibility, bool connectAssistant, bool connectFunctions);
 
     Task UpdatePromptAsync(ConversationReference reference,
-                           string promptId,
+                           int promptId,
                            string title,
                            string category,
                            string content,
-                           string assistant,
+                           int? assistant,
                            IEnumerable<Function> functions,
                            Visibility visibilty,
                            string replyToId,
                            CancellationToken cancellationToken);
 
     Task DeleteFunctionFromPromptAsync(ConversationReference reference,
-                           string promptId,
+                           int promptId,
                            string functionId,
                            string replyToId,
                            CancellationToken cancellationToken);
@@ -84,20 +84,20 @@ public interface IChatGPTeamsBotConfigService
                             CancellationToken cancellationToken);
     Task DeletePromptAsync(ConversationContext context,
                            ConversationReference reference,
-                           string promptId,
+                           int promptId,
                            CancellationToken cancellationToken);
     Task DeleteResourceAsync(ConversationContext context,
                              ConversationReference reference,
-                             string resourceId,
+                             int resourceId,
                              CancellationToken cancellationToken);
 
     Task<IEnumerable<Prompt>> GetAllPrompts();
 
-    Task<Prompt> GetPrompt(string id);
+    Task<Prompt> GetPrompt(int id);
 
     Task ClearHistoryAsync(ConversationContext context);
 
-    Task EnsureConversation(ConversationReference reference);
+    Task EnsureConversation(ConversationContext context);
 
     Task ShowMenuAsync(ConversationContext context,
                                            ConversationReference reference,
@@ -153,28 +153,29 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
                                               string appName,
                                               CancellationToken cancellationToken)
     {
-        var conversationId = await _conversationService.GetConversationIdByContextAsync(context);
-        var assistant = await _assistantService.GetAssistantByConversationTitle(reference.Conversation.Id);
-        var functions = await _functionService.GetFunctionsByConversation(reference.Conversation.Id);
-        var resources = await _resourceService.GetResourcesByConversationTitleAsync(reference.Conversation.Id);
-        var messages = await _messageService.GetByConversationAsync(context, conversationId);
+        var conversation = await _conversationService.GetConversationAsync(context.Id);
+
+       // var conversationId = await _conversationService.GetConversationIdByContextAsync(context);
+      //  var assistant = await _assistantService.GetAssistantByConversationTitle(reference.Conversation.Id);
+      //  var functions = await _functionService.GetFunctionsByConversation(reference.Conversation.Id);
+       // var resources = await _resourceService.GetResourcesByConversationTitleAsync(reference.Conversation.Id);
+        var messages = await _messageService.GetByConversationAsync(context, context.Id);
         await _proactiveMessageService.ShowMenuAsync(reference,
                                                      appName,
-                                                     assistant.Name,
-                                                     functions.Count(),
-                                                     resources.Count(),
+                                                     conversation.Assistant.Name,
+                                                     conversation.AllFunctionNames.Count(),
+                                                     conversation.AllResources.Count(),
                                                      messages.Count(),
                                                      cancellationToken);
     }
 
-    public async Task EnsureConversation(ConversationReference reference)
+    public async Task EnsureConversation(ConversationContext context)
     {
-        if (reference.Conversation.ConversationType == "channel")
-        {
-            await _conversationService.EnsureConversationByReferenceAsync(reference);
-        }
+     //   if (context.ChatType == ChatType.channel)
+     //   {
+            await _conversationService.EnsureConversationAsync(context.Id, context.TeamsId, context.ChannelId);
+      //  }
     }
-
 
     public async Task SelectFunctionsAsync(ConversationContext context,
                                            ConversationReference reference,
@@ -186,7 +187,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
 
         // Determine available functions by filtering out ones that are already assigned
         var availableFunctions = allFunctions
-            .Where(f => !conversation.AllFunctionNames.Any(cf => cf == f.Name))
+            .Where(f => !conversation.AllFunctionNames.Any(cf => cf == f.Id))
             .ToList();
 
         // Identify assistant-specific and conversation-specific functions
@@ -221,17 +222,15 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
                            string categoryFilter, string ownerFilter, Visibility? visibilityFilter, CancellationToken cancellationToken)
     {
         var prompts = await _promptService.GetMyPromptsAsync();
-        var conversation = await _conversationService.GetConversationByContextAsync(context);
-        var messages = await _messageService.GetByConversationAsync(context, conversation.Id);
 
         await _proactiveMessageService.SelectPromptsAsync(reference, prompts, replyToId,
-        context.UserDisplayName, skip, titleFilter, categoryFilter, ownerFilter, messages.Count(), visibilityFilter, cancellationToken);
+        context.UserDisplayName, skip, titleFilter, categoryFilter, ownerFilter, visibilityFilter, cancellationToken);
     }
 
     public async Task SelectResourcesAsync(ConversationContext context, ConversationReference reference, string replyToId, CancellationToken cancellationToken)
     {
         var conversation = await _conversationService.GetConversationByContextAsync(context);
-        var isOwner = conversation.Assistant.Owners.Any(a => a.DisplayName == reference.User.Name);
+        var isOwner = conversation.Assistant.Owner != null && conversation.Assistant.Owner.Id == reference.User.AadObjectId;
         var messages = await _messageService.GetByConversationAsync(context, conversation.Id);
 
         await _proactiveMessageService.SelectResourcesAsync(reference, isOwner, messages.Count(),
@@ -269,10 +268,11 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         await SelectFunctionsAsync(context, reference, context.ReplyToId, cancellationToken);
     }
 
-    public async Task ChangeAssistantAsync(ConversationContext context, ConversationReference reference, string assistantName, CancellationToken cancellationToken)
+    public async Task ChangeAssistantAsync(ConversationContext context, ConversationReference reference, 
+            string assistantName, CancellationToken cancellationToken)
     {
         var assistant = await _assistantService.GetAssistantByName(assistantName);
-        await _conversationService.ChangeConversationAssistantAsync(context, assistant.Id);
+        await _conversationService.ChangeConversationAssistantAsync(context, assistant.Name);
 
         await SelectAssistantAsync(context, reference, context.ReplyToId, cancellationToken);
     }
@@ -289,7 +289,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         var conversation = await _conversationService.GetConversationByContextAsync(context);
         var currentUser = await _userService.GetCurrentUser();
 
-        if (conversation.Assistant.Owners.Any(y => y.Id == currentUser.Id))
+        if (conversation.Assistant.Owner != null && conversation.Assistant.Owner.Id == currentUser.Id)
         {
             var assistant = await _assistantService.GetAssistant(conversation.Assistant.Id);
             assistant.Prompt = assistantRole;
@@ -312,7 +312,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
 
     public async Task DeletePromptAsync(ConversationContext context,
        ConversationReference reference,
-       string promptId,
+       int promptId,
        CancellationToken cancellationToken)
     {
         await _promptService.DeletePromptAsync(promptId);
@@ -322,7 +322,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
 
     public async Task DeleteResourceAsync(ConversationContext context,
           ConversationReference reference,
-          string resourceId,
+          int resourceId,
           CancellationToken cancellationToken)
     {
         await _resourceService.DeleteResourceAsync(resourceId);
@@ -359,15 +359,16 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
 
         if (connectFunctions)
         {
-               newPrompt.Functions = await _functionService.GetFunctionsByConversation(context.Id);
+            var conversation = await _conversationService.GetConversationAsync(context.Id);
+            newPrompt.Functions =conversation.Functions;
         }
 
         await _promptService.CreatePromptAsync(newPrompt);
     }
 
-    public async Task UpdatePromptAsync(ConversationReference reference, string promptId, string title, string category,
-    string content, string assistant, IEnumerable<Function> functions,
-    Visibility visibilty, string replyToId, CancellationToken cancellationToken)
+    public async Task UpdatePromptAsync(ConversationReference reference, int promptId, string title, string category,
+            string content, int? assistant, IEnumerable<Function> functions,
+            Visibility visibilty, string replyToId, CancellationToken cancellationToken)
     {
         var prompt = await _promptService.GetPromptAsync(promptId);
         prompt.Title = title;
@@ -387,7 +388,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
             prompt.Department = null;
         }
 
-        prompt.Assistant = !string.IsNullOrEmpty(assistant) ? await _assistantService.GetAssistant(assistant) : null;
+        prompt.Assistant = assistant.HasValue ? await _assistantService.GetAssistant(assistant.Value) : null;
 
         await _promptService.UpdatePromptAsync(prompt);
 
@@ -398,15 +399,16 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
 
     public async Task EditPromptAsync(ConversationReference reference, Prompt prompt, string replyToId, CancellationToken cancellationToken)
     {
+        var currentItem = await _promptService.GetPromptAsync(prompt.Id);
         var assistants = await _assistantService.GetMyAssistants();
         var functions = await _functionService.GetAllFunctionsAsync();
         var categories = await _promptService.GetCategories();
 
-        await _proactiveMessageService.EditPromptAsync(reference, prompt, assistants,
+        await _proactiveMessageService.EditPromptAsync(reference, currentItem, assistants,
                 functions, categories, replyToId, cancellationToken);
     }
 
-    public async Task DeleteFunctionFromPromptAsync(ConversationReference reference, string promptId,
+    public async Task DeleteFunctionFromPromptAsync(ConversationReference reference, int promptId,
         string functionId,
         string replyToId,
          CancellationToken cancellationToken)
@@ -436,7 +438,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         await SelectResourcesAsync(context, reference, replyToId, cancellationToken);
     }
 
-    public async Task<Prompt> GetPrompt(string id)
+    public async Task<Prompt> GetPrompt(int id)
     {
         return await _promptService.GetPromptAsync(id);
     }

@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Attributes;
+using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Models.Graph;
 using Microsoft.Graph;
 
@@ -11,7 +12,7 @@ namespace achappey.ChatGPTeams.Services.Graph
     public partial class GraphFunctionsClient
     {
 
-        [MethodDescription("Searches for your Planner tasks based on title or description.")]
+        [MethodDescription("Planner|Searches for your Planner tasks based on title or description.")]
         public async Task<IEnumerable<Models.Graph.PlannerTask>> SearchMyPlannerTasks(
             [ParameterDescription("The task title to filter on.")] string title = null,
             [ParameterDescription("The description to filter on.")] string description = null)
@@ -30,7 +31,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return filteredTasks.Select(t => _mapper.Map<Models.Graph.PlannerTask>(t));
         }
 
-        [MethodDescription("Creates a new Planner task with the given details.")]
+        [MethodDescription("Planner|Creates a new Planner task with the given details.")]
         public async Task<Models.Graph.PlannerTask> CreatePlannerTask(
             [ParameterDescription("The ID of the Planner to create the task in.")] string plannerId,
             [ParameterDescription("The ID of the bucket to create the task in.")] string bucketId,
@@ -56,23 +57,35 @@ namespace achappey.ChatGPTeams.Services.Graph
             return _mapper.Map<Models.Graph.PlannerTask>(createdTask);
         }
 
-        [MethodDescription("Retrieves all user Planners, optionally filtered by a search term.")]
-        public async Task<IEnumerable<Models.Graph.PlannerPlan>> GetAllPlanners(
-            [ParameterDescription("The search term to filter planners by title (optional).")] string searchTerm = null)
+        [MethodDescription("Planner|Retrieves all user Planners, optionally filtered by a search term.")]
+        public async Task<string> GetAllPlanners(
+      [ParameterDescription("The search term to filter planners by title (optional).")] string searchTerm = null,
+      [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
 
+            var filterOptions = new List<QueryOption>();
+
+            if (!string.IsNullOrEmpty(searchTerm))
+            {
+                filterOptions.Add(new QueryOption("$filter", $"contains(title, '{searchTerm}')"));
+            }
+
+            if (!string.IsNullOrEmpty(skipToken))
+            {
+                filterOptions.Add(new QueryOption("$skiptoken", skipToken));
+            }
+
             var planners = await graphClient.Me.Planner.Plans
-                                    .Request()
-                                    .GetAsync();
+                                        .Request(filterOptions)
+                                        .Top(10)
+                                        .GetAsync();
 
-            var filteredPlanners = planners.Where(p =>
-                string.IsNullOrEmpty(searchTerm) || p.Title.ToLower().Contains(searchTerm.ToLower()));
-
-            return filteredPlanners.Select(_mapper.Map<Models.Graph.PlannerPlan>);
+            return planners.Select(_mapper.Map<Models.Graph.PlannerPlan>).ToHtmlTable(planners.NextPageRequest?.QueryOptions.FirstOrDefault(a => a.Name == "$skiptoken")?.Value);
         }
 
-        [MethodDescription("Retrieves the buckets associated with a specific Planner.")]
+
+        [MethodDescription("Planner|Retrieves the buckets associated with a specific Planner.")]
         public async Task<IEnumerable<Models.Graph.PlannerBucket>> GetPlannerBuckets(
             [ParameterDescription("The ID of the Planner to get buckets from.")] string plannerId)
         {
@@ -85,7 +98,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return buckets.Select(b => _mapper.Map<Models.Graph.PlannerBucket>(b));
         }
 
-        [MethodDescription("Retrieves all tasks from a specified bucket within a Planner.")]
+        [MethodDescription("Planner|Retrieves all tasks from a specified bucket within a Planner.")]
         public async Task<IEnumerable<Models.Graph.PlannerTask>> GetTasksFromBucket(
             [ParameterDescription("The ID of the Planner containing the bucket.")] string plannerId,
             [ParameterDescription("The ID of the bucket to retrieve tasks from.")] string bucketId)
@@ -99,7 +112,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return tasks.Select(t => _mapper.Map<Models.Graph.PlannerTask>(t));
         }
 
-        [MethodDescription("Creates a new Planner plan within the specified group.")]
+        [MethodDescription("Planner|Creates a new Planner plan within the specified group.")]
         public async Task<Models.Graph.PlannerPlan> CreatePlanner(
             [ParameterDescription("The ID of the group to create the Planner plan in.")] string groupId,
             [ParameterDescription("The title of the Planner plan.")] string title)
@@ -119,7 +132,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return _mapper.Map<Models.Graph.PlannerPlan>(createdPlan);
         }
 
-        [MethodDescription("Creates a new bucket within the specified Planner plan.")]
+        [MethodDescription("Planner|Creates a new bucket within the specified Planner plan.")]
         public async Task<Models.Graph.PlannerBucket> CreateBucket(
             [ParameterDescription("The ID of the Planner plan to create the bucket in.")] string planId,
             [ParameterDescription("The name of the bucket.")] string bucketName)
@@ -139,7 +152,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             return _mapper.Map<Models.Graph.PlannerBucket>(createdBucket);
         }
 
-        [MethodDescription("Copies all details, buckets, and tasks (including checklists) from a source Planner to a target Planner.")]
+        [MethodDescription("Planner|Copies all details, buckets, and tasks (including checklists) from a source Planner to a target Planner.")]
         public async Task<Models.Response> CopyPlanner(
             [ParameterDescription("The ID of the source Planner to copy from.")] string sourcePlannerId,
             [ParameterDescription("The ID of the target Planner to copy to.")] string targetPlannerId)

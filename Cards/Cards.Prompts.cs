@@ -51,7 +51,7 @@ namespace achappey.ChatGPTeams.Cards
             };
         }
 
-        public static Attachment CreatePromptFormCard(string promptId, string title, string prompt)
+        public static Attachment CreatePromptFormCard(int promptId, string title, string prompt)
         {
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0));
 
@@ -207,6 +207,15 @@ namespace achappey.ChatGPTeams.Cards
                 }
             }
 
+            card.Body.Add(new AdaptiveToggleInput()
+            {
+                Id = "KeepContext",
+                Label = "Dialoog context behouden",
+                Wrap = true,
+                Title = "Vink dit veld aan als je door willen blijven chatten met dezelfde AI-assistent, functies en chatbronnen.",
+                Separator = true
+            });
+
             card.Actions.Add(new AdaptiveSubmitAction
             {
                 Id = "promptForm",
@@ -242,7 +251,7 @@ namespace achappey.ChatGPTeams.Cards
             var factSet = new AdaptiveFactSet
             {
                 Spacing = AdaptiveSpacing.Small,
-                
+
                 Facts = new List<AdaptiveFact>
     {
         new AdaptiveFact("Tekst", "{veldNaam(type=text)}"),
@@ -320,7 +329,7 @@ namespace achappey.ChatGPTeams.Cards
                         Placeholder = CardsConfigText.SelectAiAssistantText,
                         Label = CardsConfigText.AiAssistantText,
                         Style = AdaptiveChoiceInputStyle.Compact,
-                        Value = selectedPrompt.Assistant?.Id
+                        Value = selectedPrompt.Assistant?.Id.ToString()
                     },
 
                       new AdaptiveChoiceSetInput

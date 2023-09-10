@@ -24,7 +24,14 @@ public class PlannerBucket
 public class PlannerPlan
 {
     public string Title { get; set; }
-    public string Id { get; set; }
+
+    public PlannerPlanContainer Container { get; set; }
+}
+
+
+public class PlannerPlanContainer
+{
+    public string Url { get; set; }
 }
 
 public class PlannerTaskDetails

@@ -43,6 +43,7 @@ public class KeyVaultRepository : IKeyVaultRepository
             .WithAuthority(new Uri(authority))
             .Build();
 
+
         string[] scopes = new List<string>() { "https://vault.azure.net/.default" }.ToArray();
 
         // Note that this is blocking the async call, consider restructuring if needed

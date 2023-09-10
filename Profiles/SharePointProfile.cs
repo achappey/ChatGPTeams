@@ -16,6 +16,8 @@ public class SharePointProfile : AutoMapper.Profile
     {
         CreateMap<Activity, Models.Message>()
             .ForMember(dest => dest.Content, opt => opt.MapFrom(src => src.Text))
+            .ForMember(dest => dest.Created, opt => opt.MapFrom(src => DateTimeOffset.Now))
+            .ForMember(dest => dest.Id, opt => opt.MapFrom(src => 0))
             .ForMember(dest => dest.TeamsId, opt => opt.MapFrom(src => src.Id))
             .ForMember(dest => dest.Reference, opt => opt.MapFrom(src => src.GetConversationReference()))
             .ForMember(dest => dest.Role, opt => opt.MapFrom(src => Role.user));
@@ -26,14 +28,14 @@ public class SharePointProfile : AutoMapper.Profile
             .ForMember(dest => dest.Department, opt => opt.MapFrom(src => src.GetDepartment()))
             .ForMember(dest => dest.Visibility, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIVisibility).ToVisibility()))
             .ForMember(dest => dest.Functions, opt => opt.MapFrom(src => src.GetFieldValues(FieldNames.AIFunctions).Select(a => a.ToFunction())))
-            .ForMember(dest => dest.Owners, opt => opt.MapFrom(src => src.GetOwners()))
+            //.ForMember(dest => dest.Owners, opt => opt.MapFrom(src => src.GetOwners()))
             .ForMember(dest => dest.Temperature, opt => opt.MapFrom(src => float.Parse(src.GetFieldValue(FieldNames.AITemperature), CultureInfo.InvariantCulture)))
             .ForMember(dest => dest.Prompt, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIPrompt)));
 
         CreateMap<ListItem, Models.User>()
             .ForMember(dest => dest.DisplayName, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.Title)))
             .ForMember(dest => dest.Mail, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.Email)))
-            .ForMember(dest => dest.ContentType, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.ContentType)))
+          //  .ForMember(dest => dest.ContentType, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.ContentType)))
             .ForMember(dest => dest.Department, opt => opt.MapFrom(src => src.Fields.AdditionalData.ContainsKey(FieldNames.AIDepartment) ? src.GetFieldValue(FieldNames.AIDepartment).NameToDepartment() : null));
 
         CreateMap<ListItem, Models.Conversation>()
@@ -51,7 +53,7 @@ public class SharePointProfile : AutoMapper.Profile
             .ForMember(dest => dest.Assistant, opt => opt.MapFrom(src => src.GetAssistant()));
 
         CreateMap<ListItem, Function>()
-               .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIName)))
+               .ForMember(dest => dest.Id, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIName)))
                .ForMember(dest => dest.Category, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AICategory)))
                .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIUrl)))
                .ForMember(dest => dest.Publisher, opt => opt.MapFrom(src => src.GetFieldValue(FieldNames.AIPublisher)))

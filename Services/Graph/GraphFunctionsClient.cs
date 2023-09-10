@@ -4,6 +4,7 @@ using System.Linq;
 using System.Net.Http.Headers;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Attributes;
+using achappey.ChatGPTeams.Extensions;
 using AutoMapper;
 using Microsoft.Graph;
 
@@ -37,7 +38,7 @@ namespace achappey.ChatGPTeams.Services.Graph
             };
         }
 
-        [MethodDescription("Get an e-mail by id.")]
+        [MethodDescription("Mail|Get an e-mail by id.")]
         public async Task<Models.Graph.Email> GetMail(
             [ParameterDescription("The ID of the e-mail.")] string id)
         {
@@ -47,11 +48,11 @@ namespace achappey.ChatGPTeams.Services.Graph
             return this._mapper.Map<Models.Graph.Email>(message);
         }
 
-        // Search for groups based on group name or description.
-        [MethodDescription("Searches for groups based on name or description.")]
-        public async Task<IEnumerable<Models.Graph.Group>> SearchGroups(
-            [ParameterDescription("The group name to filter on.")] string name = null,
-            [ParameterDescription("The description to filter on.")] string description = null)
+        [MethodDescription("Groups|Searches for groups based on name or description.")]
+        public async Task<string> SearchGroups(
+                [ParameterDescription("The group name to filter on.")] string name = null,
+                [ParameterDescription("The description to filter on.")] string description = null,
+                [ParameterDescription("The next page skip token.")] string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
 
@@ -69,13 +70,17 @@ namespace achappey.ChatGPTeams.Services.Graph
                 filterOptions.Add(new QueryOption("$search", searchQuery));
             }
 
+            if (!string.IsNullOrEmpty(skipToken))
+            {
+                filterOptions.Add(new QueryOption("$skiptoken", skipToken));
+            }
+
             var groups = await graphClient.Groups.Request(filterOptions)
-                        .Header("ConsistencyLevel", "eventual")
-                        .GetAsync();
+                            .Header("ConsistencyLevel", "eventual")
+                            .GetAsync();
 
-            return groups.Select(t => _mapper.Map<Models.Graph.Group>(t));
+            return groups.CurrentPage.Select(_mapper.Map<Models.Graph.Group>).ToHtmlTable(groups.NextPageRequest?.QueryOptions.FirstOrDefault(a => a.Name == "$skiptoken")?.Value);
         }
-
 
 
 

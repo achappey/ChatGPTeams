@@ -7,15 +7,14 @@ using Microsoft.Extensions.Caching.Memory;
 using System;
 using System.Linq;
 using achappey.ChatGPTeams.Extensions;
+using AutoMapper;
 
 namespace achappey.ChatGPTeams.Services;
 
 public interface IResourceService
 {
-    Task<IEnumerable<Resource>> GetResourcesByConversationTitleAsync(string conversationTitle);
-    Task<IEnumerable<Resource>> GetResourcesByAssistantAsync(Assistant assistant);
-    Task<string> CreateResourceAsync(Resource resource);
-    Task DeleteResourceAsync(string id);
+    Task<int> CreateResourceAsync(Resource resource);
+    Task DeleteResourceAsync(int id);
     Task<int> ImportResourceAsync(ConversationReference reference, Resource resource);
     Task<string> GetFileName(Resource resource);
     Task<Resource> GetResource(string id);
@@ -27,34 +26,32 @@ public class ResourceService : IResourceService
     private readonly IResourceRepository _resourceRepository;
     private readonly IEmbeddingRepository _embeddingRepository;
     private readonly IConversationRepository _conversationRepository;
+    private readonly IMapper _mapper;  // Declare the field
     private readonly IMemoryCache _cache;
 
-    public ResourceService(IResourceRepository resourceRepository, IConversationRepository conversationRepository,
-    IEmbeddingRepository embeddingRepository, IMemoryCache cache)
+    public ResourceService(
+        IResourceRepository resourceRepository,
+        IConversationRepository conversationRepository,
+        IEmbeddingRepository embeddingRepository,
+        IMemoryCache cache,
+        IMapper mapper)  // Inject AutoMapper
     {
         _resourceRepository = resourceRepository;
         _conversationRepository = conversationRepository;
         _embeddingRepository = embeddingRepository;
+        _mapper = mapper;  // Initialize the AutoMapper field
         _cache = cache;
-    }
-
-    public async Task<IEnumerable<Resource>> GetResourcesByConversationTitleAsync(string conversationTitle)
-    {
-        var conversation =  await _conversationRepository.GetByTitle(conversationTitle);
-        var resources =  await _resourceRepository.GetByConversation(conversation.Id);
-        var assistantResources = await _resourceRepository.GetByAssistant(conversation.Assistant.Id);
-
-        return assistantResources.Concat(resources);
     }
 
     public async Task<string> GetFileName(Resource resource)
     {
-        return await _resourceRepository.GetFileName(resource);
+        return await _resourceRepository.GetFileName(_mapper.Map<Database.Models.Resource>(resource));
     }
-
-     public async Task<Resource> GetResource(string id)
+    public async Task<Resource> GetResource(string id)
     {
-        return await _resourceRepository.Get(id);
+        var item = await _resourceRepository.Get(id);
+
+        return _mapper.Map<Resource>(item);
     }
 
     public async Task<int> ImportResourceAsync(ConversationReference reference, Resource resource)
@@ -65,13 +62,14 @@ public class ResourceService : IResourceService
         }
 
         var cacheKey = resource.Url;
-        resource.Conversation = await _conversationRepository.GetByTitle(reference.Conversation.Id);
 
-        var currentResources = await GetResourcesByConversationTitleAsync(reference.Conversation.Id);
+        var currentResources = await _resourceRepository.GetByConversation(reference.Conversation.Id);
 
         if (!currentResources.Any(e => e.Url == resource.Url))
         {
-            var lines = await _resourceRepository.Read(resource);
+            var mappedResource = _mapper.Map<Database.Models.Resource>(resource);
+
+            var lines = await _resourceRepository.Read(mappedResource);
 
             if (lines != null && lines.Count() > 0)
             {
@@ -83,7 +81,9 @@ public class ResourceService : IResourceService
 
                     _cache.Set(cacheKey, cacheEntry);
 
-                    await _resourceRepository.Create(resource);
+                    var resourceId = await _resourceRepository.Create(mappedResource);
+                    await _conversationRepository.AddResource(reference.Conversation.Id, resourceId);
+
 
                     return lines.Count();
                 }
@@ -93,22 +93,17 @@ public class ResourceService : IResourceService
         return 0;
     }
 
-    public async Task<IEnumerable<Resource>> GetResourcesByAssistantAsync(Assistant assistant)
+    public async Task<int> CreateResourceAsync(Resource resource)
     {
-        return await _resourceRepository.GetByAssistant(assistant.Id);
-    }
-
-    public async Task<string> CreateResourceAsync(Resource resource)
-    {
-        return await _resourceRepository.Create(resource);
+        return await _resourceRepository.Create(_mapper.Map<Database.Models.Resource>(resource));
     }
 
     public async Task UpdateResourceAsync(Resource resource)
     {
-        await _resourceRepository.Update(resource);
+        await _resourceRepository.Update(_mapper.Map<Database.Models.Resource>(resource));
     }
 
-    public async Task DeleteResourceAsync(string id)
+    public async Task DeleteResourceAsync(int id)
     {
         await _resourceRepository.Delete(id);
     }
