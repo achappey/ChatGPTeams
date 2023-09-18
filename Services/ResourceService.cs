@@ -19,6 +19,7 @@ public interface IResourceService
     Task<string> GetFileName(Resource resource);
     Task<Resource> GetResource(string id);
     Task UpdateResourceAsync(Resource resource);
+    Task<IEnumerable<Resource>> GetResourcesByConversation(string id);
 }
 
 public class ResourceService : IResourceService
@@ -52,6 +53,13 @@ public class ResourceService : IResourceService
         var item = await _resourceRepository.Get(id);
 
         return _mapper.Map<Resource>(item);
+    }
+
+ public async Task<IEnumerable<Resource>> GetResourcesByConversation(string id)
+    {
+        var items = await _resourceRepository.GetByConversation(id);
+
+        return items.Select(_mapper.Map<Resource>);
     }
 
     public async Task<int> ImportResourceAsync(ConversationReference reference, Resource resource)

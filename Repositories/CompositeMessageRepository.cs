@@ -15,6 +15,7 @@ public interface IMessageRepository
     Task Delete(int id);
     Task DeleteByConversationAndTeamsId(string conversationId, string teamsId);
     Task DeleteByConversationAndDateTime(string conversationId, DateTime date);
+    Task<IEnumerable<Resource>> GetResourcesByContext(ConversationContext context, DateTimeOffset? cutOff);
 }
 
 
@@ -49,6 +50,8 @@ public class CompositeMessageRepository : IMessageRepository
             case ChatType.groupchat:
                 messageList.AddRange(await _teamsChatMessageRepository.GetByConversation(context.Id));
                 break;
+            default:
+                break;
         }
 
         if (conversation.CutOff.HasValue)
@@ -58,6 +61,29 @@ public class CompositeMessageRepository : IMessageRepository
 
         return messageList.OrderBy(a => a.Created);
     }
+
+    public async Task<IEnumerable<Resource>> GetResourcesByContext(ConversationContext context, DateTimeOffset? cutOff)
+    {
+        var resourceList = new List<Resource>();
+
+        switch (context.ChatType)
+        {
+            case ChatType.channel:
+                var items = await _teamsChannelMessageRepository.GetMessageAttachments(context.TeamsId, context.ChannelId, context.MessageId);
+                resourceList.AddRange(items.Select(_mapper.Map<Resource>));
+                break;
+            case ChatType.groupchat:
+
+               var chatItems = await _teamsChatMessageRepository.GetMessageAttachments(context.Id, cutOff);
+                resourceList.AddRange(chatItems.Select(_mapper.Map<Resource>));
+                break;
+            default:
+                break;
+        }
+
+        return resourceList.Where(t => t.Url != null);
+    }
+
 
     public async Task<int> Create(Database.Models.Message message)
     {

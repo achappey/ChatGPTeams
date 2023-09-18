@@ -13,6 +13,7 @@ public interface IMessageService
     Task DeleteMessageById(int id);
     Task DeleteByConversationAndTeamsId(string conversationId, string messageId);
     Task<IEnumerable<Message>> GetByConversationAsync(ConversationContext context, string conversationId);
+    Task<IEnumerable<Resource>> GetResourcesByContext(ConversationContext context);
 }
 
 public class MessageService : IMessageService
@@ -30,6 +31,14 @@ public class MessageService : IMessageService
         _mapper = mapper;
         _conversationService = conversationService;
         _userRepository = userRepository;
+    }
+
+
+    public async Task<IEnumerable<Resource>> GetResourcesByContext(ConversationContext context)
+    {
+        var conversation = await _conversationService.GetConversationAsync(context.Id);
+        return await _messageRepository.GetResourcesByContext(context, conversation.CutOff);
+
     }
 
 

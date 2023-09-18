@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Repositories;
-using achappey.ChatGPTeams.Extensions;
 using System.Linq;
 using AutoMapper;
 
@@ -24,17 +23,12 @@ public class PromptService : IPromptService
 {
     private readonly IPromptRepository _promptRepository;
     private readonly IUserService _userService;
-    private readonly IDepartmentRepository _departmentRepository;
-    private readonly IFunctionRepository _functionRepository;
     private readonly IMapper _mapper;
 
-    public PromptService(IPromptRepository promptRepository, IUserService userService, IMapper mapper,
-    IFunctionRepository functionRepository, IDepartmentRepository departmentRepository)
+    public PromptService(IPromptRepository promptRepository, IUserService userService, IMapper mapper)
     {
         _promptRepository = promptRepository;
         _userService = userService;
-        _departmentRepository = departmentRepository;
-        _functionRepository = functionRepository;
         _mapper = mapper;
     }
 

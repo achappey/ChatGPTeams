@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using OpenAI.Managers;
 using OpenAI.ObjectModels.RequestModels;
 using SharpToken;
+using Newtonsoft.Json;
 
 namespace achappey.ChatGPTeams.Repositories;
 
@@ -23,6 +24,9 @@ public class ChatRepository : IChatRepository
     private readonly IMapper _mapper;
     private readonly OpenAIService _openAIService;
 
+    private const double MaxTokenSizeFactor = 0.8;
+    private const double MaxReservedTokenFactor = 1 / 3.0;
+
     public ChatRepository(ILogger<ChatRepository> logger,
     OpenAIService openAIService, IMapper mapper)
     {
@@ -30,6 +34,81 @@ public class ChatRepository : IChatRepository
         _mapper = mapper;
         _openAIService = openAIService;
     }
+
+
+    private async IAsyncEnumerable<Message> AttemptChatStreamAsync(Conversation conversation)
+    {
+        var chatCompletionRequest = ToChatCompletionCreateRequest(conversation);
+
+        await foreach (var response in _openAIService.ChatCompletion.CreateCompletionAsStream(chatCompletionRequest))
+        {
+            if (response.Successful)
+            {
+                var message = response.Choices.FirstOrDefault()?.Message;
+                yield return _mapper.Map<Message>(message);
+            }
+            else
+            {
+                throw new Exception(response.Error.Message);
+            }
+        }
+    }
+
+    private IAsyncEnumerable<Message> ChatWithFallback(Conversation chat)
+    {
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
+        int maxTokenSize = CalculateMaxTokenSize(chat.Assistant.Model.MaxTokenSize);
+        EnsureTokenSizeWithinLimit(chat, encoding, maxTokenSize);
+
+        return AttemptChatStreamAsync(chat);
+    }
+    private IAsyncEnumerable<Message> ChatWithBestContextStreamAsync(IEnumerable<EmbeddingScore> topResults, Conversation chat)
+    {
+        var encoding = GptEncoding.GetEncoding("cl100k_base");
+        int maxTokenSize = CalculateMaxTokenSize(chat.Assistant.Model.MaxTokenSize);
+
+        int chatHistoryTokens = CalculateChatHistoryTokens(chat.Messages, encoding);
+        EnsureTokenSizeWithinLimit(chat, encoding, maxTokenSize, chatHistoryTokens);
+
+        int remainingTokensAfterChat = maxTokenSize - chatHistoryTokens;
+        int reservedTokensForEmbeddings = (remainingTokensAfterChat > maxTokenSize * MaxReservedTokenFactor)
+        ? remainingTokensAfterChat
+        : (int)(maxTokenSize * MaxReservedTokenFactor);
+
+        List<EmbeddingScore> selectedEmbeddings = CalculateAndLimitTokens(topResults, reservedTokensForEmbeddings, encoding);
+
+        var contextQuery = CreateContextQuery(selectedEmbeddings);
+        chat.Assistant.Prompt += contextQuery;
+
+        return AwaitAndMapChatStreamAsync(chat, CreateContextQueryJson(selectedEmbeddings));
+    }
+
+    private async IAsyncEnumerable<Message> AwaitAndMapChatStreamAsync(Conversation conversation, string contextQuery)
+    {
+        await foreach (var responseMessage in AttemptChatStreamAsync(conversation))
+        {
+            responseMessage.ContextQuery = contextQuery;
+            yield return responseMessage;
+        }
+    }
+
+    private int CalculateMaxTokenSize(int modelMaxTokenSize) => (int)Math.Floor(modelMaxTokenSize * MaxTokenSizeFactor);
+
+    private int CalculateChatHistoryTokens(List<Message> messages, GptEncoding encoding) => messages.Select(message => encoding.Encode(message.Content)).Sum(encoded => encoded.Count());
+
+    private void EnsureTokenSizeWithinLimit(Conversation chat, GptEncoding encoding, int maxTokenSize, int? currentChatHistoryTokens = null)
+    {
+        int chatHistoryTokens = currentChatHistoryTokens ?? CalculateChatHistoryTokens(chat.Messages, encoding);
+
+        while (chatHistoryTokens > maxTokenSize * MaxReservedTokenFactor && chat.Messages.Count > 1)
+        {
+            var oldestMessage = chat.Messages.First();
+            chatHistoryTokens -= encoding.Encode(oldestMessage.Content).Count();
+            chat.Messages.RemoveAt(0);
+        }
+    }
+
+
 
     private ChatCompletionCreateRequest ToChatCompletionCreateRequest(Conversation conversation)
     {
@@ -59,74 +138,7 @@ public class ChatRepository : IChatRepository
         return ChatWithBestContextStreamAsync(items, conversation);
     }
 
-    private IAsyncEnumerable<Message> ChatWithFallback(Conversation chat)
-    {
-        int maxTokenSize = chat.Assistant.Model.Name == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
-        var encoding = GptEncoding.GetEncoding("cl100k_base");
-
-        // Calculate the total token size
-        int totalTokenSize = chat.Messages
-            .Select(message => encoding.Encode(message.Content))
-            .Sum(encoded => encoded.Count());
-
-        // Remove oldest messages if the total token size exceeds the maximum
-        while (totalTokenSize > maxTokenSize && chat.Messages.Count > 0)
-        {
-            var oldestMessage = chat.Messages.First();
-            totalTokenSize -= encoding.Encode(oldestMessage.Content).Count();
-            chat.Messages.RemoveAt(0);
-        }
-
-        return AttemptChatStreamAsync(chat);
-    }
-
-    private async IAsyncEnumerable<Message> AttemptChatStreamAsync(Conversation conversation)
-    {
-        var chatCompletionRequest = ToChatCompletionCreateRequest(conversation);
-
-        await foreach (var response in _openAIService.ChatCompletion.CreateCompletionAsStream(chatCompletionRequest))
-        {
-            if (response.Successful)
-            {
-                var message = response.Choices.FirstOrDefault()?.Message;
-                yield return _mapper.Map<Message>(message);
-            }
-            else {
-                throw new Exception(response.Error.Message);
-            }
-        }
-    }
-
-    private IAsyncEnumerable<Message> ChatWithBestContextStreamAsync(IEnumerable<EmbeddingScore> topResults, Conversation chat)
-    {
-        int maxTokenSize = chat.Assistant.Model.Name == "gpt-4" ? (int)Math.Floor(8192 * 0.8) : (int)Math.Floor(16384 * 0.8);
-
-        var encoding = GptEncoding.GetEncoding("cl100k_base");
-
-        // Calculate chat history tokens
-        int chatHistoryTokens = chat.Messages
-                .Select(message => encoding.Encode(message.Content))
-                .Sum(encoded => encoded.Count());
-
-        int remainingTokensAfterChat = maxTokenSize - chatHistoryTokens;
-        int reservedTokensForEmbeddings = (remainingTokensAfterChat > maxTokenSize / 3) ? remainingTokensAfterChat : maxTokenSize / 3;
-
-        // If chat history exceeds its 50% quota, trim it
-        while (chatHistoryTokens > maxTokenSize / 3 && chat.Messages.Count > 1)
-        {
-            var oldestMessage = chat.Messages.First();
-            chatHistoryTokens -= encoding.Encode(oldestMessage.Content).Count();
-            chat.Messages.RemoveAt(0);
-        }
-
-        List<EmbeddingScore> selectedEmbeddings = CalculateAndLimitTokens(topResults, reservedTokensForEmbeddings, encoding);
-
-        var contextQuery = CreateContextQuery(selectedEmbeddings);
-        chat.Assistant.Prompt += contextQuery;
-
-        return AttemptChatStreamAsync(chat);
-    }
-
+ 
     private List<EmbeddingScore> CalculateAndLimitTokens(IEnumerable<EmbeddingScore> topResults, int availableTokens, GptEncoding encoding)
     {
         int totalEmbeddingTokens = 0;
@@ -158,13 +170,27 @@ public class ChatRepository : IChatRepository
             .GroupBy(r => r.Url)
             .Select(g => new
             {
-                //Url = HttpUtility.UrlEncode(g.Key),
                 Url = g.Key,
                 BestScore = g.Max(r => r.Score),
-                Texts = string.Join(",", g.Select(r => r.Text.Trim()))
+                Texts = string.Join(" ", g.OrderBy(t => t.Score).Select(r => r.Text.Trim()))
             })
             .OrderByDescending(g => g.BestScore)
             .Select(g => $"Attachments: [{g.Url}]:{g.Texts}"));
+    }
+
+
+    private string CreateContextQueryJson(IEnumerable<EmbeddingScore> topResults)
+    {
+        return JsonConvert.SerializeObject(topResults
+            .GroupBy(r => r.Url)
+            .Select(g => new
+            {
+                Url = g.Key,
+                BestScore = g.Max(r => r.Score),
+                Texts = g.OrderBy(t => t.Score).Select(r => r.Text.Trim())
+            })
+            .OrderByDescending(g => g.BestScore)
+            .Select(g => new { g.Url, Text = g.Texts }));
     }
 
 

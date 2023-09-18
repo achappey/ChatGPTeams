@@ -29,6 +29,8 @@ namespace achappey.ChatGPTeams.Models
 
         public string? TeamsId { get; set; }
 
+        public string? ContextQuery { get; set; }        
+
         public ChatType ChatType { get; set; }
 
         public FunctionCall? FunctionCall { get; set; }

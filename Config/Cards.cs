@@ -42,6 +42,7 @@ public static class CardsConfigText
     public const string NextPageText = ">";
     public const string PrevPageText = "<";
     public const string EditDialogText = "Dialoog wijzigen";
+    public const string ShowSourcesText = "Toon bronteksten";
     public const string DialogEditedText = "Dialoog gewijzigd";
     public const string DialogExecuteText = "Dialoog uitvoeren";
     public const string CleanHistoryText = "Geschiedenis wissen";

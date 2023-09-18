@@ -32,9 +32,8 @@ public class ConversationService : IConversationService
     private readonly IMessageRepository _messageRepository;
     private readonly ITeamsService _teamsService;
     private readonly IMapper _mapper;
-    private readonly IMigrateRepository _migrateRepository;
 
-    public ConversationService(IConversationRepository conversationRepository, IMigrateRepository migrateRepository,
+    public ConversationService(IConversationRepository conversationRepository,
      IResourceRepository resourceRepository, IMapper mapper,
         IAssistantService assistantService, IMessageRepository messageRepository, ITeamsService teamsService)
     {
@@ -44,7 +43,6 @@ public class ConversationService : IConversationService
         _mapper = mapper;
         _resourceRepository = resourceRepository;
         _teamsService = teamsService;
-        _migrateRepository = migrateRepository;
     }
 
     public async Task<Conversation> GetConversationByContextAsync(ConversationContext context)

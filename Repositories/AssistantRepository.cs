@@ -58,7 +58,6 @@ public class AssistantRepository : IAssistantRepository
         .Include(a => a.Resources)
         .Include(a => a.Functions)
         .FirstOrDefaultAsync(a => a.Id == id);
-        //return _mapper.Map<Assistant>(item);
     }
 
     public async Task<Assistant> GetByName(string name)
@@ -86,7 +85,6 @@ public class AssistantRepository : IAssistantRepository
     {
         try
         {
-            //_context.Attach(assistant.Owners.First());
             await _context.Assistants.AddAsync(assistant);
             await _context.SaveChangesAsync();
             return assistant.Id;

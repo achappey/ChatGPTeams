@@ -155,6 +155,7 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
             await _proactiveMessageService.UpdateMessageAsync(reference, accumulatedContent.ToString(), messageId, cancellationToken);
         }
 
+        // If conversation is personal and message content is not empty, save the message
         if (reference.Conversation.ConversationType == "personal" && !string.IsNullOrEmpty(accumulatedContent.ToString()))
         {
             completeMessage.Content = accumulatedContent.ToString();
@@ -163,8 +164,12 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
             completeMessage.ConversationId = reference.Conversation.Id;
             completeMessage.Role = Role.assistant;
 
-            // If conversation is personal and message content is not empty, save the message
             await _messageService.CreateMessageAsync(completeMessage);
+        }
+
+        if (!string.IsNullOrEmpty(completeMessage.ContextQuery))
+        {
+            await _proactiveMessageService.UsedSourcesAsync(reference, completeMessage.ContextQuery, cancellationToken);
         }
     }
 
@@ -176,11 +181,15 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
         var items = attachments.SelectMany(a => _mapper.Map<IEnumerable<Resource>>(a))
                                 .Where(a => !string.IsNullOrEmpty(a.Url) && !string.IsNullOrEmpty(a.Name))
                                 .GroupBy(a => a.Url)
-                                .Select(g => g.First());
+                                .Select(g => g.First())
+                                .ToList();
 
-        foreach (var item in items)
+        items.AddRange(await this._messageService.GetResourcesByContext(context));
+
+        var currentResources = await _resourceService.GetResourcesByConversation(context.Id);
+
+        foreach (var item in items.Where(a => !currentResources.Any(y => y.Url == a.Url)))
         {
-
             var cardId = await _proactiveMessageService.ImportResourceAsync(reference, item, cancellationToken);
             var lineCount = await _resourceService.ImportResourceAsync(reference, item);
 

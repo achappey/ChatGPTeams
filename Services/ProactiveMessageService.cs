@@ -62,6 +62,10 @@ public interface IProactiveMessageService
         string replyId,
         CancellationToken cancellationToken);
 
+    Task UsedSourcesAsync(ConversationReference conversationReference,
+        string result,
+        CancellationToken cancellationToken);
+
     Task<string> ImportResourceAsync(ConversationReference conversationReference,
        Resource resource,
        CancellationToken cancellationToken);
@@ -187,6 +191,19 @@ public class ProactiveMessageService : IProactiveMessageService
                    card.Id = replyId;
 
                    await turnContext.UpdateActivityAsync(card, cancellationToken);
+
+               }, cancellationToken);
+    }
+
+     public async Task UsedSourcesAsync(ConversationReference conversationReference,
+        string result,
+        CancellationToken cancellationToken)
+    {
+        await _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
+               {
+                   var card = MessageFactory.Attachment(ChatCards.CreateContextQueryCard(result));
+
+                   await turnContext.SendActivityAsync(card, cancellationToken);
 
                }, cancellationToken);
     }

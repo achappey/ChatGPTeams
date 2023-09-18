@@ -1,6 +1,4 @@
-using System.Collections.Generic;
 using System.Threading.Tasks;
-using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Repositories;
 
 namespace achappey.ChatGPTeams.Services;
@@ -22,7 +20,6 @@ public class EmbeddingService : IEmbeddingService
 
     public async Task<byte[]> GetEmbeddingFromTextAsync(string content)
     {
-        // Add any necessary logic here before calling the repository
         return await _embeddingRepository.GetEmbeddingFromTextAsync(content);
     }
 }

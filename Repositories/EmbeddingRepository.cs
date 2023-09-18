@@ -133,44 +133,6 @@ public class EmbeddingRepository : IEmbeddingRepository
     }
 
 
-    public async Task<IEnumerable<byte[]>> GetEmbeddingsFromLinesAsync2(IEnumerable<string> lines)
-    {
-        const int maxTokenSize = 8191;
-        var encoding = GptEncoding.GetEncoding("cl100k_base");
-        var files = new List<byte[]>();
-        var currentBatch = new List<string>();
-        int currentTokenSize = 0;
-
-        foreach (var line in lines)
-        {
-            int lineTokenSize = encoding.Encode(line).Count();
-
-            if (currentTokenSize + lineTokenSize > maxTokenSize)
-            {
-                // Process the current batch since adding the current line would exceed the max token size
-                byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
-                files.Add(embeddings);
-
-                // Start a new batch
-                currentBatch.Clear();
-                currentTokenSize = 0;
-            }
-
-            currentBatch.Add(line);
-            currentTokenSize += lineTokenSize;
-        }
-
-        // Process any remaining lines in the current batch
-        if (currentBatch.Any())
-        {
-            byte[] embeddings = await CalculateEmbeddingAsync(currentBatch);
-            files.Add(embeddings);
-        }
-
-        return files;
-    }
-
-
     private async Task<byte[]> CalculateEmbeddingAsync(object input)
     {
         var embeddingRequest = new EmbeddingCreateRequest()

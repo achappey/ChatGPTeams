@@ -41,15 +41,6 @@ namespace achappey.ChatGPTeams.Extensions
             };
         }
 
-        public static Reaction ToReaction(this LookupField value)
-        {
-            return new Reaction()
-            {
-                Id = value.LookupId.ToString(),
-                Title = value.LookupValue
-            };
-        }
-
         public static User GetOwner(this Microsoft.Graph.ListItem src)
         {
             if (!src.Fields.AdditionalData.ContainsKey(FieldNames.AIOwner.ToLookupField()))

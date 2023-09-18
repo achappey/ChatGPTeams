@@ -10,7 +10,6 @@ using AutoMapper;
 using HtmlAgilityPack;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
-//using Microsoft.Graph;
 using Newtonsoft.Json;
 
 namespace achappey.ChatGPTeams.Repositories;
@@ -19,7 +18,6 @@ public interface IResourceRepository
 {
     Task<Resource> Get(string id);
     Task<IEnumerable<Resource>> GetByConversation(string conversationId);
-    // Task<IEnumerable<Resource>> GetByAssistant(int assistantId);
     Task<int> Create(Resource resource);
     Task<IEnumerable<string>> Read(Resource resource);
     Task Delete(int id);
@@ -29,14 +27,11 @@ public interface IResourceRepository
 
 public class ResourceRepository : IResourceRepository
 {
-    private readonly string _siteId;
     private readonly ILogger<ResourceRepository> _logger;
     private readonly IMapper _mapper;
     private readonly IGraphClientFactory _graphClientFactory;
     private readonly IHttpClientFactory _httpClientFactory;
     private readonly ChatGPTeamsContext _context;
-
-    private readonly string _selectQuery = $"{FieldNames.Title},{FieldNames.AIAssistant},{FieldNames.AIAssistant.ToLookupField()},{FieldNames.AIConversation.ToLookupField()},{FieldNames.AIContentUrl}";
 
     public ResourceRepository(ILogger<ResourceRepository> logger, ChatGPTeamsContext chatGPTeamsContext,
     AppConfig config, IMapper mapper, IHttpClientFactory httpClientFactory,
@@ -44,7 +39,6 @@ public class ResourceRepository : IResourceRepository
     {
         _logger = logger;
         _mapper = mapper;
-        _siteId = config.SharePointSiteId;
         _context = chatGPTeamsContext;
         _httpClientFactory = httpClientFactory;
         _graphClientFactory = graphClientFactory;
@@ -57,14 +51,7 @@ public class ResourceRepository : IResourceRepository
             return _graphClientFactory.Create();
         }
     }
-
-    /*  public async Task<Resource> Get2(string id)
-      {
-          var item = await GraphService.GetListItemFromListAsync(_siteId, ListNames.AIResources, id, _selectQuery);
-
-          return _mapper.Map<Resource>(item);
-      }*/
-
+    
     public async Task<Resource> Get(string id)
     {
         var item = await _context.Resources.FindAsync(id);
@@ -77,7 +64,6 @@ public class ResourceRepository : IResourceRepository
         || t.Assistants.Any(z => z.Conversations.Any(n => n.Id == conversationId))).ToListAsync();
 
     }
-
 
     public async Task<string> GetFileName(Resource resource)
     {

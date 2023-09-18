@@ -57,10 +57,8 @@ public class GraphProfile : Profile
 
         CreateMap<Microsoft.Graph.ChatMessageAttachment, Resource>()
               .ForMember(dest => dest.Url, opt => opt.MapFrom(src => src.ContentUrl))
+              .ForMember(dest => dest.Id, opt => opt.Ignore())
               .ForMember(dest => dest.Name, opt => opt.MapFrom(src => src.Name));
-
-        CreateMap<Microsoft.Graph.ChatMessageReaction, Reaction>()
-              .ForMember(dest => dest.Title, opt => opt.MapFrom(src => src.ReactionType));
 
         CreateMap<Microsoft.Graph.ChatMessage, Message>()
                .ForMember(dest => dest.Created, opt => opt.MapFrom(src => src.CreatedDateTime.Value))
