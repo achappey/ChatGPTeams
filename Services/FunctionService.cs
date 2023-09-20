@@ -22,7 +22,6 @@ public interface IFunctionService
     Task DeleteFunctionFromConversationAsync(ConversationReference reference, string functionName);
     Task AddFunctionResult(ConversationReference reference, FunctionCall functionCall, string result);
     Task HandleFunctionMissing(ConversationReference reference, FunctionCall functionCall);
-    //Task<IEnumerable<Function>> GetFunctionsByConversation(string conversationTitle);
     Task<IEnumerable<Function>> GetFunctionsByFiltersAsync(string publisher = null, string category = null);
     Task<IEnumerable<string>> GetFunctionsPublishersAsync();
     Task<IEnumerable<string>> GetFunctionsCategoriesAsync();
@@ -110,7 +109,6 @@ public class FunctionService : IFunctionService
 
         await _messageRepository.Create(new Database.Models.Message()
         {
-            //Role = Role.function,
             Role = Database.Models.Role.function,
             Content = result,
             Created = DateTimeOffset.Now,
@@ -123,27 +121,13 @@ public class FunctionService : IFunctionService
     public async Task AddFunctionToConversationAsync(ConversationReference reference, string functionName)
     {
         await _conversationRepository.AddFunction(reference.Conversation.Id, functionName);
-        //var function = await _functionRepository.Get(functionName);
-        //var conversation = await _conversationRepository.Get(reference.Conversation.Id);
-        //await _conversationRepository.AddFunction(new Database.Models.ConversationFunction()
-        // {
-        //  ConversationId = reference.Conversation.Id,
-        //   FunctionId = functionName
-        // });
-        //        var functions = conversation.Functions.ToList();
-        //      functions.Add(function);
-        //    conversation.Functions = functions;
-
-        //  await _conversationRepository.Update(conversation);
+    
     }
 
     public async Task DeleteFunctionFromConversationAsync(ConversationReference reference, string functionName)
     {
         await _conversationRepository.DeleteFunction(reference.Conversation.Id, functionName);
 
-        //  var conversation = await _conversationRepository.Get(reference.Conversation.Id);
-        //     conversation.Functions = conversation.Functions.Where(a => a.Id != functionName);
-        //  await _conversationRepository.Update(conversation);
     }
 
     public async Task<Function> GetFunctionAsync(string id)
@@ -158,7 +142,6 @@ public class FunctionService : IFunctionService
         var items = await _functionDefinitonRepository.GetAll();
 
         return items;
-        //  return items.Select(_mapper.Map<Function>);
     }
 
     public async Task<IEnumerable<Function>> GetFunctionsByFiltersAsync(string publisher = null, string category = null)
@@ -192,17 +175,4 @@ public class FunctionService : IFunctionService
         return items.Select(a => "").Distinct();
     }
 
-    /*   public async Task<IEnumerable<Function>> GetFunctionsByConversation(string conversationTitle)
-       {
-           var conversation = await _conversationRepository.GetByTitle(conversationTitle);
-           var assistant = await _assistantRepository.Get(conversation.Assistant.Id);
-
-           // Assuming assistant.Functions is also a collection of Functions
-           var assistantFunctions = assistant.Functions;
-
-           // Concatenating the functions from conversation and assistant
-           var combinedFunctions = conversation.Functions.Concat(assistantFunctions);
-
-           return combinedFunctions;
-       }*/
 }

@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Net.Http;
 using System.Threading.Tasks;
-using achappey.ChatGPTeams.Config.SharePoint;
 using achappey.ChatGPTeams.Database;
 using achappey.ChatGPTeams.Database.Models;
 using achappey.ChatGPTeams.Extensions;

@@ -38,7 +38,8 @@ namespace achappey.ChatGPTeams.Services.Graph
         }
 
         private async Task<string> SearchContent(
-                              string query, EntityType type, string skipToken = null)
+                              string query, EntityType type, 
+                              string skipToken = null)
         {
             var graphClient = GetAuthenticatedClient();
 

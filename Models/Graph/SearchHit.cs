@@ -1,4 +1,4 @@
-using System.Collections.Generic;
+using System.Web;
 
 namespace achappey.ChatGPTeams.Models.Graph;
 
@@ -10,5 +10,14 @@ public class SearchHit
 
 public class Resource
 {
-    public string WebUrl { get; set; }
+    public string _webUrl { get; set; }
+
+    public string WebUrl
+    {
+        get => HttpUtility.UrlEncode(_webUrl);
+        set
+        {
+            _webUrl = value;
+        }
+    }
 }

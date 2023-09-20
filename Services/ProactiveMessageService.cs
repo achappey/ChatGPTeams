@@ -93,6 +93,7 @@ public interface IProactiveMessageService
     Task ShowMenuAsync(ConversationReference conversationReference,
         string appName,
         string assistantName,
+        float creativity,
         int functionCount,
         int resourceCount,
         int messageCount,
@@ -146,6 +147,7 @@ public class ProactiveMessageService : IProactiveMessageService
     public Task ShowMenuAsync(ConversationReference conversationReference,
         string appName,
         string assistantName,
+        float creativity,
         int functionCount,
         int resourceCount,
         int messageCount,
@@ -153,7 +155,7 @@ public class ProactiveMessageService : IProactiveMessageService
     {
         return _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
               {
-                  var card = MessageFactory.Attachment(ChatCards.CreateHeroCard(appName, assistantName, functionCount, resourceCount, messageCount));
+                  var card = MessageFactory.Attachment(ChatCards.CreateMenuCard(appName, assistantName, creativity, functionCount, resourceCount, messageCount));
 
                   await turnContext.SendActivityAsync(card, cancellationToken);
 
@@ -195,9 +197,9 @@ public class ProactiveMessageService : IProactiveMessageService
                }, cancellationToken);
     }
 
-     public async Task UsedSourcesAsync(ConversationReference conversationReference,
-        string result,
-        CancellationToken cancellationToken)
+    public async Task UsedSourcesAsync(ConversationReference conversationReference,
+       string result,
+       CancellationToken cancellationToken)
     {
         await _adapter.ContinueConversationAsync(_appId, conversationReference, async (turnContext, cancellationToken) =>
                {

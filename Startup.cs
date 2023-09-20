@@ -14,6 +14,8 @@ using achappey.ChatGPTeams.Repositories;
 using OpenAI.Managers;
 using achappey.ChatGPTeams.Database;
 using Microsoft.EntityFrameworkCore;
+using System.Globalization;
+using Microsoft.AspNetCore.Localization;
 
 //ngrok http 3978 --host-header="localhost:3978"
 
@@ -40,6 +42,8 @@ namespace achappey.ChatGPTeams
             {
                 options.SerializerSettings.MaxDepth = HttpHelper.BotMessageSerializerSettings.MaxDepth;
             });
+
+            services.AddLocalization(options => options.ResourcesPath = "Resources");
 
             // Create the Bot Framework Authentication to be used with the Bot Adapter.
             services.AddSingleton<BotFrameworkAuthentication, ConfigurationBotFrameworkAuthentication>();
@@ -131,6 +135,7 @@ namespace achappey.ChatGPTeams
                     new OpenAIProfile()
                     });
             });
+
             IMapper mapper = mapperConfig.CreateMapper();
             services.AddSingleton(mapper);
         }
@@ -153,6 +158,13 @@ namespace achappey.ChatGPTeams
                 });
 
             // app.UseHttpsRedirection();
+
+               app.UseRequestLocalization(new RequestLocalizationOptions
+                {
+                    DefaultRequestCulture = new RequestCulture("nl-NL"),
+                    SupportedCultures = new List<CultureInfo> { new CultureInfo("nl-NL"), new CultureInfo("en-US") },
+                    SupportedUICultures = new List<CultureInfo> { new CultureInfo("nl-NL"), new CultureInfo("en-US") }
+                });
         }
     }
 }

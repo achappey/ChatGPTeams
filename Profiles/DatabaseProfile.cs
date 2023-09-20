@@ -15,6 +15,7 @@ public class DatabaseProfile : AutoMapper.Profile
         CreateMap<Database.Models.Function, Function>().ReverseMap();
         CreateMap<Database.Models.Model, Model>().ReverseMap();
         CreateMap<Database.Models.Department, Department>().ReverseMap();
+
         CreateMap<Database.Models.Message, Message>()
         .ForMember(dest => dest.Reference, opt => opt.MapFrom(src => JsonConvert.DeserializeObject<ConversationReference>(src.Reference)))
         .ForMember(dest => dest.FunctionCall, opt => opt.MapFrom(src => src.FunctionCall != null ? JsonConvert.DeserializeObject<FunctionCall>(src.FunctionCall) : null))

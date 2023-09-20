@@ -6,7 +6,6 @@ using System.Web;
 using achappey.ChatGPTeams.Attributes;
 using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Models.Simplicate;
-using Newtonsoft.Json;
 
 namespace achappey.ChatGPTeams.Services.Simplicate
 {

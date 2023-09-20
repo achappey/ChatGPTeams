@@ -3,13 +3,12 @@
 namespace achappey.ChatGPTeams.Models.Simplicate;
 
 using Newtonsoft.Json;
+using System;
 using System.Collections.Generic;
-
 
 public class TimelineMessage
 {
-    [JsonProperty("id")]
-    public string Id { get; set; }
+    private string _content { get; set; }
 
     [JsonProperty("message_type")]
     public MessageType MessageType { get; set; }
@@ -21,25 +20,26 @@ public class TimelineMessage
     public string CreatedAt { get; set; }
 
     [JsonProperty("content")]
-    public string Content { get; set; }
+    public string Content
+    {
+        get => _content?.Substring(0, Math.Min(_content?.Length ?? 0, 150));
+        set
+        {
+            _content = value;
+        }
+    }
 
 }
 
 
 public class MessageType
 {
-    [JsonProperty("id")]
-    public string Id { get; set; }
-
-     [JsonProperty("label")]
+    [JsonProperty("label")]
     public string Label { get; set; }
 }
 
 public class LinkedTo
 {
-    [JsonProperty("id")]
-    public string Id { get; set; }
-
-      [JsonProperty("label")]
+    [JsonProperty("label")]
     public string Label { get; set; }
 }

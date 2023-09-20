@@ -37,6 +37,8 @@ public class GraphProfile : Profile
         CreateMap<Microsoft.Graph.TeamworkHardwareDetail, Models.Graph.HardwareDetail>();
         CreateMap<Microsoft.Graph.Message, Models.Graph.Resource>();
         CreateMap<Microsoft.Graph.Event, Models.Graph.Event>();
+        CreateMap<Microsoft.Graph.Device, Models.Graph.Device>();
+        CreateMap<Microsoft.Graph.ManagedDevice, Models.Graph.ManagedDevice>();
         CreateMap<Microsoft.Graph.SitePage, Models.Graph.Page>();
         CreateMap<Microsoft.Graph.DateTimeTimeZone, Models.Graph.DateTimeTimeZone>();
 

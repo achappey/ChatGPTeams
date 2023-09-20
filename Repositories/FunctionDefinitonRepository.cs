@@ -18,8 +18,6 @@ namespace achappey.ChatGPTeams.Repositories;
 
 public interface IFunctionDefinitonRepository
 {
-    // Task<Department> Get(string id);
-    // Task<Department> GetByName(string name);
     Task<IEnumerable<Function>> GetAll();
     Task<IEnumerable<Function>> GetByNames(IEnumerable<string> names);
 }
@@ -92,7 +90,6 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
         {
             FunctionDefinition = f,
             Id = f.Name,
-            // Category = [needthis]
             Publisher = publisherId
         });
     }
@@ -105,8 +102,8 @@ public class FunctionDefinitonRepository : IFunctionDefinitonRepository
 
          var graphFuncs = MapFunctionDefinitions(GetGraphFunctionDefinitions(), "Microsoft");
          var simplicateFuncs = MapFunctionDefinitions(GetSimplicateFunctionDefinitions(), "Simplicate");
-         var customFuncs = MapFunctionDefinitions(await GetCustomFunctionDefinitions(), "Custom");
-         var builtinFuncs = MapFunctionDefinitions(GetBuiltinFunctionDefinitions(), _appName);
+         var customFuncs = MapFunctionDefinitions(await GetCustomFunctionDefinitions(), _appName);
+         var builtinFuncs = MapFunctionDefinitions(GetBuiltinFunctionDefinitions(), _appName + "GPT");
          var builtinVaultFuncs = MapFunctionDefinitions(GetBuiltinVaultFunctionDefinitions(), "Microsoft");
 
          // Combine all mapped Function objects into a single list

@@ -9,8 +9,6 @@ namespace achappey.ChatGPTeams.Cards
 
         public static Attachment CreateErrorCard(string errorMessage)
         {
-            // parse the JSON string to a dictionary
-
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
             {
                 Body = {
@@ -37,11 +35,7 @@ namespace achappey.ChatGPTeams.Cards
             };
         }
 
-
-
-
-
-        public static Attachment CreateHeroCard(string appName, string assistantName, int functionCount, int resourceCount, int messageCount)
+        public static Attachment CreateMenuCard(string appName, string assistantName, float creativity, int functionCount, int resourceCount, int messageCount)
         {
             var card = new AdaptiveCard(new AdaptiveSchemaVersion(1, 0))
             {
@@ -56,7 +50,7 @@ namespace achappey.ChatGPTeams.Cards
                 Actions = {
                     new AdaptiveSubmitAction
                     {
-                        Title = $"{CardsConfigText.SelectYourAiAssistantText} ({assistantName})",
+                        Title = $"{CardsConfigText.SelectYourAiAssistantText} ({assistantName}, {creativity})",
                         Data = new { ActionType = CardsConfigCommands.SelectRoleCommand }
                     },
                     new AdaptiveSubmitAction

@@ -5,6 +5,7 @@ using AutoMapper;
 using achappey.ChatGPTeams.Models;
 using System.Linq;
 using Microsoft.Bot.Schema;
+using Microsoft.Extensions.Localization;
 
 namespace achappey.ChatGPTeams.Services;
 
@@ -95,7 +96,7 @@ public interface IChatGPTeamsBotConfigService
 
     Task<Prompt> GetPrompt(int id);
 
-    Task ClearHistoryAsync(ConversationContext context);
+    Task ClearHistoryAsync(ConversationContext context, ConversationReference reference, CancellationToken cancellationToken);
 
     Task EnsureConversation(ConversationContext context);
 
@@ -123,6 +124,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
 
     private readonly IProactiveMessageService _proactiveMessageService;
     private readonly IMapper _mapper;
+     private readonly IStringLocalizer<ChatGPTeamsBotConfigService> _localizer;
 
 
     public ChatGPTeamsBotConfigService(IAssistantService assistantService,
@@ -134,6 +136,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
                                  IDepartmentService departmentService,
                                  IProactiveMessageService proactiveMessageService,
                                  IFunctionService functionService,
+                                 IStringLocalizer<ChatGPTeamsBotConfigService> localizer,
                                  IResourceService resourceService)
     {
         _assistantService = assistantService;
@@ -142,6 +145,7 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         _promptService = promptService;
         _messageService = messageService;
         _resourceService = resourceService;
+        _localizer = localizer;
         _userService = userService;
         _departmentService = departmentService;
         _mapper = mapper;
@@ -155,14 +159,11 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
     {
         var conversation = await _conversationService.GetConversationAsync(context.Id);
 
-       // var conversationId = await _conversationService.GetConversationIdByContextAsync(context);
-      //  var assistant = await _assistantService.GetAssistantByConversationTitle(reference.Conversation.Id);
-      //  var functions = await _functionService.GetFunctionsByConversation(reference.Conversation.Id);
-       // var resources = await _resourceService.GetResourcesByConversationTitleAsync(reference.Conversation.Id);
         var messages = await _messageService.GetByConversationAsync(context, context.Id);
         await _proactiveMessageService.ShowMenuAsync(reference,
                                                      appName,
                                                      conversation.Assistant.Name,
+                                                     conversation.Temperature,
                                                      conversation.AllFunctionNames.Count(),
                                                      conversation.AllResources.Count(),
                                                      messages.Count(),
@@ -330,9 +331,11 @@ public class ChatGPTeamsBotConfigService : IChatGPTeamsBotConfigService
         await SelectResourcesAsync(context, reference, context.ReplyToId, cancellationToken);
     }
 
-    public async Task ClearHistoryAsync(ConversationContext context)
+    public async Task ClearHistoryAsync(ConversationContext context, ConversationReference reference, CancellationToken cancellationToken)
     {
+        //_localizer["HistoryCleared"]
         await _conversationService.ClearConversationHistoryAsync(context, null);
+        await _proactiveMessageService.SendMessageAsync(reference, "Geschiedenis gewist", cancellationToken);
 
     }
 

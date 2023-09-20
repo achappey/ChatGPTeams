@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using achappey.ChatGPTeams.Models;
 using achappey.ChatGPTeams.Repositories;
-using achappey.ChatGPTeams.Extensions;
 using AutoMapper;
 
 namespace achappey.ChatGPTeams.Services;

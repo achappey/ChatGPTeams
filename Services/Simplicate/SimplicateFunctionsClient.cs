@@ -4,16 +4,13 @@ using System.Diagnostics;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
-using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Text;
 using System.Threading.Tasks;
 using System.Web;
-using achappey.ChatGPTeams.Attributes;
 using achappey.ChatGPTeams.Extensions;
 using achappey.ChatGPTeams.Repositories;
 using AutoMapper;
-using Microsoft.Graph;
 using Newtonsoft.Json;
 
 namespace achappey.ChatGPTeams.Services.Simplicate
@@ -57,7 +54,6 @@ namespace achappey.ChatGPTeams.Services.Simplicate
                 Timestamp = DateTime.UtcNow
             };
         }
-        // Get an Authenticated Simplicate client using the token issued to the user.
 
         private async Task<HttpClient> GetAuthenticatedHttpClient()
         {

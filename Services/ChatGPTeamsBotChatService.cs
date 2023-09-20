@@ -167,7 +167,7 @@ public class ChatGPTeamsBotChatService : IChatGPTeamsBotChatService
             await _messageService.CreateMessageAsync(completeMessage);
         }
 
-        if (!string.IsNullOrEmpty(completeMessage.ContextQuery))
+        if (!string.IsNullOrEmpty(completeMessage?.ContextQuery))
         {
             await _proactiveMessageService.UsedSourcesAsync(reference, completeMessage.ContextQuery, cancellationToken);
         }

@@ -61,14 +61,11 @@ namespace achappey.ChatGPTeams
 
         public override async Task OnTurnAsync(ITurnContext turnContext, CancellationToken cancellationToken = default)
         {
-
-
             await base.OnTurnAsync(turnContext, cancellationToken);
             await ConversationState.SaveChangesAsync(turnContext, false, cancellationToken);
             await UserState.SaveChangesAsync(turnContext, false, cancellationToken);
-
-
         }
+
         string ReplaceMatchedFields(string prompt, MatchCollection matches, string placeholder, string value)
         {
             foreach (Match match in matches)
@@ -92,12 +89,14 @@ namespace achappey.ChatGPTeams
 
             if (token != null)
             {
-                await _chatGPTeamsBotConfigService.EnsureConversation(await turnContext.ToConversationContext());
+                var conversationContext = await turnContext.ToConversationContext();
+                var conversationReference = turnContext.Activity.GetConversationReference();
+                await _chatGPTeamsBotConfigService.EnsureConversation(conversationContext);
 
                 if (turnContext.Activity.Attachments != null)
                 {
-                    await _chatGPTeamsBotChatService.ProcessAttachmentsAsync(await turnContext.ToConversationContext(),
-                                                                         turnContext.Activity.GetConversationReference(),
+                    await _chatGPTeamsBotChatService.ProcessAttachmentsAsync(conversationContext,
+                                                                         conversationReference,
                                                                          turnContext.Activity.Attachments,
                                                                          cancellationToken);
                 }
@@ -117,11 +116,12 @@ namespace achappey.ChatGPTeams
                     {
                         if (text == "geschiedenis wissen")
                         {
-                            await _chatGPTeamsBotConfigService.ClearHistoryAsync(await turnContext.ToConversationContext());
+                            await _chatGPTeamsBotConfigService.ClearHistoryAsync(conversationContext,
+                                conversationReference, cancellationToken);
                         }
                         else
                         {
-                            await _chatGPTeamsBotChatService.ProcessMessageAsync(await turnContext.ToConversationContext(), _mapper.Map<Message>(turnContext.Activity),
+                            await _chatGPTeamsBotChatService.ProcessMessageAsync(conversationContext, _mapper.Map<Message>(turnContext.Activity),
                                                                                                                             cancellationToken);
                         }
                     }
@@ -133,7 +133,6 @@ namespace achappey.ChatGPTeams
                     data = JObject.FromObject(data);
 
                     var actionType = data["ActionType"].Value<string>();
-                    var context = await turnContext.ToConversationContext();
 
                     string titleFilter = null;
                     string ownerFilter = null;
@@ -166,7 +165,7 @@ namespace achappey.ChatGPTeams
                             var executePrompt = await _chatGPTeamsBotConfigService.GetPrompt(executePromptId);
 
                             var formCard = ChatCards.CreatePromptFormCard(executePrompt.Id, executePrompt.Title, executePrompt.Content);
-                            await turnContext.SendActivityAsync(MessageFactory.Attachment(formCard), cancellationToken: cancellationToken);
+                            await turnContext.SendActivityAsync(MessageFactory.Attachment(formCard), cancellationToken);
                             break;
 
                         case CardsConfigCommands.PromptFormAction:
@@ -190,7 +189,6 @@ namespace achappey.ChatGPTeams
                                 }
                             }
 
-
                             foreach (Match match in generalPattern2Matches)
                             {
                                 string placeholder = match.Groups[1].Value;
@@ -201,8 +199,8 @@ namespace achappey.ChatGPTeams
 
                             message.Content = sourcePrompt;
 
-                            await _chatGPTeamsBotChatService.ExecuteCustomPrompt(await turnContext.ToConversationContext(),
-                                                                             turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotChatService.ExecuteCustomPrompt(conversationContext,
+                                                                             conversationReference,
                                                                              promptId,
                                                                              message,
                                                                              turnContext.Activity.From.Name,
@@ -221,7 +219,7 @@ namespace achappey.ChatGPTeams
                             var category = data.ContainsKey("Category") ? data["Category"].Value<string>() : null;
                             var functionChoices = data.ContainsKey("FunctionChoices") ? data["FunctionChoices"].Value<string>().ToFunctions() : null;
 
-                            await _chatGPTeamsBotConfigService.UpdatePromptAsync(turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.UpdatePromptAsync(conversationReference,
                                                                                  promptSaveId,
                                                                                  newTitle,
                                                                                  category,
@@ -237,8 +235,8 @@ namespace achappey.ChatGPTeams
                         case CardsConfigCommands.UpdateRoleAction:
                             var newAssistant = data["Role"].Value<string>();
 
-                            await _chatGPTeamsBotConfigService.ChangeAssistantAsync(await turnContext.ToConversationContext(),
-                                                                                    turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.ChangeAssistantAsync(conversationContext,
+                                                                                    conversationReference,
                                                                                     newAssistant,
                                                                                     cancellationToken);
                             break;
@@ -249,8 +247,8 @@ namespace achappey.ChatGPTeams
                             var newAssistantvisiblity = data["VisibilityChoice"].Value<string>().TextToVisibility();
                             var newRole = data[CardsConfigCommands.NewRole].Value<string>();
 
-                            await _chatGPTeamsBotConfigService.UpdateAssistantAsync(await turnContext.ToConversationContext(),
-                                                                                    turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.UpdateAssistantAsync(conversationContext,
+                                                                                    conversationReference,
                                                                                     newName,
                                                                                     newRole,
                                                                                     float.Parse(newTemp),
@@ -262,57 +260,58 @@ namespace achappey.ChatGPTeams
                             var promptResourceId = data["ResourceId"].Value<int>();
                             var prompt = await _promptService.GetPromptAsync(promptResourceId);
 
-                            await _chatGPTeamsBotConfigService.EditPromptAsync(turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.EditPromptAsync(conversationReference,
                                                                                prompt,
                                                                                null,
                                                                                cancellationToken);
 
                             break;
                         case CardsConfigCommands.CloneAssistantAction:
-                            await _chatGPTeamsBotConfigService.CloneAssistantAsync(await turnContext.ToConversationContext(),
-                                                                             turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.CloneAssistantAsync(conversationContext,
+                                                                             conversationReference,
                                                                              cancellationToken);
                             break;
                         case CardsConfigCommands.AddFunctionAction:
                             var properties = data.Properties().Where(a => a.Name.StartsWith("Function"));
                             var values = properties.Select(a => a.Value.Value<string>()).Where(a => !string.IsNullOrEmpty(a));
 
-                            await _chatGPTeamsBotConfigService.AddFunctionsAsync(await turnContext.ToConversationContext(),
-                                                                           turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.AddFunctionsAsync(conversationContext,
+                                                                           conversationReference,
                                                                            values,
                                                                            cancellationToken);
                             break;
                         case CardsConfigCommands.DeleteFunctionAction:
                             var function = data["FunctionName"].Value<string>();
 
-                            await _chatGPTeamsBotConfigService.DeleteFunctionAsync(await turnContext.ToConversationContext(),
-                                                                             turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.DeleteFunctionAsync(conversationContext,
+                                                                             conversationReference,
                                                                              function,
                                                                              cancellationToken);
                             break;
                         case CardsConfigCommands.CleanHistoryAction:
                             var keepMessages = data.ContainsKey("KeepMessages") ? data["KeepMessages"].Value<int?>() : null;
 
-                            await _chatGPTeamsBotConfigService.ClearHistoryAsync(await turnContext.ToConversationContext());
+                            await _chatGPTeamsBotConfigService.ClearHistoryAsync(conversationContext, conversationReference, cancellationToken);
 
-                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(context, turnContext.Activity.GetConversationReference(), 0,
-                             context.ReplyToId, titleFilter, categoryFilter, ownerFilter, visiblityFilter, cancellationToken);
+                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(conversationContext,
+                            conversationReference, 0,
+                             conversationContext.ReplyToId, titleFilter, categoryFilter, ownerFilter, visiblityFilter, cancellationToken);
                             break;
                         case CardsConfigCommands.SelectFunctionsCommand:
-                            await _chatGPTeamsBotConfigService.SelectFunctionsAsync(await turnContext.ToConversationContext(),
-                                                                              turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectFunctionsAsync(conversationContext,
+                                                                             conversationReference,
                                                                               null,
                                                                               cancellationToken);
                             break;
                         case CardsConfigCommands.SelectRoleCommand:
-                            await _chatGPTeamsBotConfigService.SelectAssistantAsync(await turnContext.ToConversationContext(),
-                                                                              turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectAssistantAsync(conversationContext,
+                                                                              conversationReference,
                                                                               null,
                                                                               cancellationToken);
                             break;
                         case CardsConfigCommands.SelectSourcesCommand:
-                            await _chatGPTeamsBotConfigService.SelectResourcesAsync(await turnContext.ToConversationContext(),
-                                                                              turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectResourcesAsync(conversationContext,
+                                                                              conversationReference,
                                                                               null,
                                                                               cancellationToken);
 
@@ -320,15 +319,15 @@ namespace achappey.ChatGPTeams
                         case CardsConfigCommands.DeleteResourceAction:
                             var promptFormResourceId = data["ResourceId"].Value<int>();
 
-                            await _chatGPTeamsBotConfigService.DeleteResourceAsync(await turnContext.ToConversationContext(),
-                                                                             turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.DeleteResourceAsync(conversationContext,
+                                                                             conversationReference,
                                                                              promptFormResourceId,
                                                                              cancellationToken);
 
                             break;
                         case CardsConfigCommands.SelectPromptCommand:
-                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(await turnContext.ToConversationContext(),
-                                                                            turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(conversationContext,
+                                                                            conversationReference,
                                                                             0,
                                                                             null, null,
                                                                             null, null, null,
@@ -336,8 +335,8 @@ namespace achappey.ChatGPTeams
 
                             break;
                         case CardsConfigCommands.DeletePromptAction:
-                            await _chatGPTeamsBotConfigService.DeletePromptAsync(context,
-                                                                           turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.DeletePromptAsync(conversationContext,
+                                                                           conversationReference,
                                                                            data["ResourceId"].Value<int>(),
                                                                            cancellationToken);
                             break;
@@ -345,29 +344,29 @@ namespace achappey.ChatGPTeams
                         case CardsConfigCommands.NextPromptPageAction:
                             var nextPage = data["NextPage"].Value<int>();
 
-                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(context,
-                                                                           turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(conversationContext,
+                                                                           conversationReference,
                                                                            nextPage,
-                                                                           context.ReplyToId,
+                                                                           conversationContext.ReplyToId,
                                                                             titleFilter, categoryFilter, ownerFilter, visiblityFilter,
                                                                            cancellationToken);
 
                             break;
                         case CardsConfigCommands.PreviousPromptPageAction:
                             var prevPage = data["PreviousPage"].Value<int>();
-                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(context,
-                                                                           turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(conversationContext,
+                                                                           conversationReference,
                                                                            prevPage,
-                                                                           context.ReplyToId,
+                                                                           conversationContext.ReplyToId,
                                                                            titleFilter, categoryFilter, ownerFilter, visiblityFilter,
                                                                            cancellationToken);
 
                             break;
                         case CardsConfigCommands.ApplyPromptFilter:
-                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(context,
-                                                                           turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.SelectPromptsAsync(conversationContext,
+                                                                           conversationReference,
                                                                            0,
-                                                                           context.ReplyToId,
+                                                                           conversationContext.ReplyToId,
                                                                            titleFilter, categoryFilter, ownerFilter, visiblityFilter,
                                                                            cancellationToken);
 
@@ -377,7 +376,7 @@ namespace achappey.ChatGPTeams
                             var removeFunctionChoice = data["RemoveFunctionChoice"].Value<string>();
                             var promptRemoveId = data["PromptRemoveId"].Value<int>();
 
-                            await _chatGPTeamsBotConfigService.DeleteFunctionFromPromptAsync(turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.DeleteFunctionFromPromptAsync(conversationReference,
                                                                                  promptRemoveId,
                                                                                  removeFunctionChoice,
                                                                                  turnContext.Activity.ReplyToId,
@@ -388,8 +387,8 @@ namespace achappey.ChatGPTeams
                         case CardsConfigCommands.PromoteResource:
                             var resourceChoiceId = data["resourceChoice"].Value<string>();
 
-                            await _chatGPTeamsBotConfigService.PromoteResourceToAssistantAsync(context,
-                                                                                turnContext.Activity.GetConversationReference(),
+                            await _chatGPTeamsBotConfigService.PromoteResourceToAssistantAsync(conversationContext,
+                                                                                conversationReference,
                                                                                  resourceChoiceId,
                                                                                  turnContext.Activity.ReplyToId,
                                                                                  cancellationToken);

@@ -5,7 +5,7 @@ namespace achappey.ChatGPTeams.Models.Graph;
 
 public class User
 {
-    public string Id { get; set; }
+    //public string Id { get; set; }
     public string DisplayName { get; set; }
     public string EmployeeId { get; set; }
     public string Department { get; set; }
